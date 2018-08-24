@@ -17,14 +17,13 @@ enum StreamType {
 class DecodeTask : public Runnable {
  public:
   // DecodeTask(int port, int channel, PlayType playType, const std::vector<unsigned char> &image);
-  DecodeTask(int port, int channel, PlayType playType, const char *buf, int size, int width, int height);
+  DecodeTask(int port, int taskId, const char *buf, int size, int width, int height);
   void Run();
   virtual ~DecodeTask();
   
  private:
   int nPort;
-  int      channel;
-  PlayType type;
+  int taskId_;
   char *pbuf_;
   int size_;
   int width_;

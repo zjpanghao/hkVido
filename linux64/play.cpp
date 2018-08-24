@@ -90,21 +90,21 @@ bool hasFilePlay(int lUserId, int channel, long startTime, long endTime) {
   return false;
 }
 
-static std::string getSerial(int channel, 
-  PlayType playType,
+static std::string getSerial(int taskId, 
   const PLAYM4_SYSTEM_TIME &playm4SystemTime, 
   const std::string &data) {
   Json::Value root;
-  root["channel"] = channel;
+  //root["channel"] = channel;
   root["data"] = data;
-  root["type"] = (int)playType;
+  root["taskId"] = taskId;
+  //root["type"] = (int)playType;
   root["time"] = getPlayTimeStr(playm4SystemTime);
   LOG(INFO) << getPlayTimeStr(playm4SystemTime);
   return root.toStyledString();
 }
 
-DecodeTask::DecodeTask(int port,  int chan, PlayType playType, const char *buf, int size, int width, int height)
-  : nPort(port), channel(chan), type(playType), size_(size), pbuf_(NULL), width_(width), height_(height) {
+DecodeTask::DecodeTask(int port,  int taskId, const char *buf, int size, int width, int height)
+  : nPort(port),taskId_(taskId) , size_(size), pbuf_(NULL), width_(width), height_(height) {
   pbuf_ = (char*)malloc(size);
   memcpy(pbuf_, buf, size);
 }
@@ -121,13 +121,10 @@ void DecodeTask::Run() {
     return;
   }
   base64Encry((char*)&image[0], image.size(), &imageBase64);
-  if (channel == -1) {
-    return;
-  }
   PLAYM4_SYSTEM_TIME playm4SystemTime;
   PlayM4_GetSystemTime(nPort, &playm4SystemTime);
   // LOG(INFO) << channel;
-  String res = getSerial(channel, type, playm4SystemTime, imageBase64);
+  String res = getSerial(taskId_, playm4SystemTime, imageBase64);
   getGuardStore(0).Send(res);
 }
 
@@ -161,7 +158,7 @@ void CALLBACK DecCBFun(int nPort,
       // LOG(INFO) << "YV12FRame" << pFrameInfo->nWidth << " " << pFrameInfo->nHeight;
       std::vector<unsigned char> inImage;
       if (nSize > 0) {
-        std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getChannel(), task->getPlayType(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
+        std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getTaskId(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
         executorService->Execute(std::move(decodeTask));
       }
      

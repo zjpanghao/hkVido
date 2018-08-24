@@ -163,7 +163,7 @@ static void playcontrol(struct evhttp_request *req, void *arg) {
     param = atol(params);
   }
   if ((rc = getDVRControl().playControl(task, flag, param)) != 0) {
-    evbuffer_add_printf(response, "{\"error_code:\"%d}", rc);
+    evbuffer_add_printf(response, "{\"error_code\":%d}", rc);
   }  else {
     evbuffer_add_printf(response, "{\"play control set\":%d,%d, %ld}", task, flag, param);
   }
@@ -190,7 +190,7 @@ static void stopplaytask(struct evhttp_request *req, void *arg) {
   }
   int task = atoi(taskId);
   if ((rc = getDVRControl().stopPlayTask(task)) != 0) {
-    evbuffer_add_printf(response, "{\"error_code:\"%d}", rc);
+    evbuffer_add_printf(response, "{\"error_code\":%d}", rc);
   }  else {
     evbuffer_add_printf(response, "{\"stopplayok\":%d}", task);
   }
@@ -237,7 +237,7 @@ static void playback(struct evhttp_request *req, void *arg) {
   }
 
   if (!hasFilePlay(user, channel, start, end)) {
-    evbuffer_add_printf(response, "{\"error_code:\"%d}", -100);
+    evbuffer_add_printf(response, "{\"error_code\":%d}", -100);
     evhttp_send_reply(req, 200, "OK", response);
     return;
   }
@@ -249,7 +249,7 @@ static void playback(struct evhttp_request *req, void *arg) {
   }
   
   if ((rc = getDVRControl().play(task)) != 0) {
-    evbuffer_add_printf(response, "{\"error_code:\"%d}", rc);
+    evbuffer_add_printf(response, "{\"error_code\":%d}", rc);
   }  else {
     evbuffer_add_printf(response, "{\"playok\":%d}", task);
   }

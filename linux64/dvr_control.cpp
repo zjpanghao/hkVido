@@ -173,7 +173,7 @@ std::string DVRControl::getTaskInfo() {
     while (it != playTaskMap.end()) {
       PlayTask* task = &it->second;
       long time = task->getUpdateTime();
-      if (current - time < 120) {
+      if (current - time < TASK_TIMEOUT_SECONDS) {
         it++;
         continue;
       }
