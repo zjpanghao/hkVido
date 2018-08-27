@@ -12,6 +12,7 @@ struct VideInfo {
   long endTime;
   int speed;
   int status;
+  int pos;
   StreamType dwStreamType;
 };
 
@@ -106,6 +107,14 @@ class PlayTask {
     StreamType getStreamType() {
       return vide.dwStreamType;
     }
+
+    void setPos(int pos) {
+      vide.pos = pos;
+    }
+
+    int getPos() {
+      return vide.pos;
+    }
     
   private:
     int taskId;
@@ -136,7 +145,9 @@ class DVRControl {
     int getPlayDePort(int taskId);
 
     void setPlayHandle(int taskId, int handle);
-     
+
+    int getPos(int taskId);
+    
     int heartBeat(int taskId);
     void taskHeartCheck();
  

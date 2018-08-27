@@ -151,6 +151,7 @@ void CALLBACK DecCBFun(int nPort,
     if (task->getStatus() == PlayTaskStatus::STOP) {
       return;
     }
+    
     long lFrameType = pFrameInfo->nType;
     if (lFrameType ==T_AUDIO16) {
         //printf("Audio nStamp:%d\n",pFrameInfo->nStamp);
@@ -158,6 +159,11 @@ void CALLBACK DecCBFun(int nPort,
       // LOG(INFO) << "YV12FRame" << pFrameInfo->nWidth << " " << pFrameInfo->nHeight;
       std::vector<unsigned char> inImage;
       if (nSize > 0) {
+        int pos;
+        playGetPos(task->getPlayHandle(), &pos);
+        if (pos != -1) {
+          task->setPos(pos);
+        }
         std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getTaskId(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
         executorService->Execute(std::move(decodeTask));
       }

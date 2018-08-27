@@ -130,10 +130,20 @@ int DVRControl::playControl(int taskId, int flag, long param) {
       }
   }
 
+  int DVRControl::getPos(int taskId) {
+      int pos = -1;
+      std::lock_guard<std::mutex> guard(lock);
+      PlayTask* task = getPlayTask(taskId);
+      if (task) {
+        return task->getPos();
+      }
+      return pos;
+  }
+
 std::string DVRControl::getTaskInfo() {
   std::lock_guard<std::mutex> guard(lock);
   auto it = playTaskMap.begin();
-  std::string result = "taskId, channel, userId, handle, deport, status, inputbytes(kb)  speed(kb/s) <br>";
+  std::string result = "taskId, channel, userId, handle, deport, status, pos,inputbytes(kb)  speed(kb/s) <br>";
   while (it != playTaskMap.end()) {
     PlayTask playTask = it->second;
     char buf[64];
@@ -153,6 +163,9 @@ std::string DVRControl::getTaskInfo() {
     result += buf;
     result += ",";
     sprintf(buf ,"%d", playTask.getStatus());
+    result += buf;
+    result += ",";
+    sprintf(buf ,"%d", playTask.getPos());
     result += buf;
     result += ",";
     sprintf(buf ,"%lldkb", playTask.getInputBytes());
