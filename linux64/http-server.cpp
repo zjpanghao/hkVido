@@ -367,46 +367,27 @@ static void logout(struct evhttp_request *req, void *arg) {
 static void
 login_request_cb(struct evhttp_request *req, void *arg)
 {
-	const char *cmdtype;
-	struct evkeyvalq *headers;
-	struct evkeyval *header;
-	struct evbuffer *buf;
-
-	switch (evhttp_request_get_command(req)) {
-  	case EVHTTP_REQ_GET: cmdtype = "GET"; break;
-  	case EVHTTP_REQ_POST: cmdtype = "POST"; break;
-  	case EVHTTP_REQ_HEAD: cmdtype = "HEAD"; break;
-  	case EVHTTP_REQ_PUT: cmdtype = "PUT"; break;
-  	case EVHTTP_REQ_DELETE: cmdtype = "DELETE"; break;
-  	case EVHTTP_REQ_OPTIONS: cmdtype = "OPTIONS"; break;
-  	case EVHTTP_REQ_TRACE: cmdtype = "TRACE"; break;
-  	case EVHTTP_REQ_CONNECT: cmdtype = "CONNECT"; break;
-  	case EVHTTP_REQ_PATCH: cmdtype = "PATCH"; break;
-  	default: cmdtype = "unknown"; break;
-	}
-
-	printf("Received a %s request for %s\nHeaders:\n",
-	    cmdtype, evhttp_request_get_uri(req));
-#if 0
-	headers = evhttp_request_get_input_headers(req);
-	for (header = headers->tqh_first; header;
-	    header = header->next.tqe_next) {
-		printf("  %s: %s\n", header->key, header->value);
-	}
-#endif
-	buf = evhttp_request_get_input_buffer(req);
-	puts("Input data: <<<");
-	while (evbuffer_get_length(buf)) {
-		int n;
-		char cbuf[128];
-		n = evbuffer_remove(buf, cbuf, sizeof(cbuf));
-		if (n > 0)
-			(void) fwrite(cbuf, 1, n, stdout);
-	}
-	puts(">>>");
-  evbuffer *response = evbuffer_new();
-  HKUser hkUser = {"admin", "ky221data", "192.168.2.3", 8000};
+	struct evkeyvalq keys;
   int rc = 0;
+  evbuffer *response = evbuffer_new();
+  const char *buffer = evhttp_request_uri(req);
+  const char *userName = NULL;
+  const char *pass = NULL;
+  const char *ip = NULL;
+  const char *port = NULL;
+  if (buffer != NULL) {
+    evhttp_parse_query(buffer, &keys);
+    userName = evhttp_find_header(&keys, "user");
+    pass = evhttp_find_header(&keys, "password");
+    ip = evhttp_find_header(&keys, "ip");
+    port = evhttp_find_header(&keys, "port");
+  }
+  
+  HKUser hkUser = { userName ? userName : "admin", 
+                    pass ? pass : "ky221data", 
+                    ip ? ip : "192.168.2.3", 
+                    port ? atoi(port) : 8000
+                    };
   if ((rc = getLoginControl().login(&hkUser)) != 0) {
     evbuffer_add_printf(response, "{\"error_code:\"%d}", rc);
   }  else {
