@@ -6,7 +6,6 @@ GuardStore& getGuardStore(int type) {
   if (type == 0) {
     return store;
   }
-  static GuardStore guardStore;
-  return guardStore;
+  return store;
 }
 

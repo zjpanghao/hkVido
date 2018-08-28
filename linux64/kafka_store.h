@@ -8,6 +8,7 @@ class KafkaStore : public GuardStore {
       this->producer_ = producer;
     }
     virtual bool Send(const std::string &message);
+    virtual bool Send(const std::string &topic, const std::string &message, int partition);
     
   private:
     KafkaProducer *producer_;

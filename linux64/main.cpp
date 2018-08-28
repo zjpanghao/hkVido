@@ -15,6 +15,9 @@
 #include "store_factory.h"
 #include "config.h"
 #include "channel.h"
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/stat.h>
 
 int ev_server_start(int);
 void showIpChannelInfo(int lUserID) {
@@ -185,18 +188,24 @@ void queryFiles(int lUserId, int channel, std::vector<std::string> *files) {
 }
 
 
-static void initGlog(const char *name) {
-  google::InitGoogleLogging(name);
-  google::SetLogDestination(google::INFO,"log/camerainfo");
-  google::SetLogDestination(google::WARNING,"log/camerawarn");
-  google::SetLogDestination(google::GLOG_ERROR,"log/cameraerror");
+static void initGlog(const std::string &name) {
+  DIR *dir = opendir("log");
+  if (!dir) {
+    mkdir("log", S_IRWXU);
+  } else {
+    closedir(dir);
+  }
+  google::InitGoogleLogging(name.c_str());
+  google::SetLogDestination(google::INFO,std::string("log/"+ name + "info").c_str());
+  google::SetLogDestination(google::WARNING,std::string("log/"+ name + "warn").c_str());
+  google::SetLogDestination(google::GLOG_ERROR,std::string("log/"+ name + "error").c_str());
   FLAGS_logbufsecs = 10;
 }
 
 
 int main() {
   initGlog("guard");
-  kunyan::Config config("guard.conf");
+  kunyan::Config config("../guard.conf");
   #if 0
   std::string ip = config.get("redis", "ip");
   int port = atoi(config.get("redis", "port").c_str());

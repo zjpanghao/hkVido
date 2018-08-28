@@ -103,8 +103,15 @@ static std::string getSerial(int taskId,
   return root.toStyledString();
 }
 
-DecodeTask::DecodeTask(int port,  int taskId, const char *buf, int size, int width, int height)
-  : nPort(port),taskId_(taskId) , size_(size), pbuf_(NULL), width_(width), height_(height) {
+DecodeTask::DecodeTask(
+  int port,  
+  int taskId, 
+  const std::string topic,
+  const char *buf, 
+  int size, 
+  int width, 
+  int height)
+    : nPort(port),taskId_(taskId), topic_(topic), size_(size), pbuf_(NULL), width_(width), height_(height) {
   pbuf_ = (char*)malloc(size);
   memcpy(pbuf_, buf, size);
 }
@@ -125,7 +132,9 @@ void DecodeTask::Run() {
   PlayM4_GetSystemTime(nPort, &playm4SystemTime);
   // LOG(INFO) << channel;
   String res = getSerial(taskId_, playm4SystemTime, imageBase64);
-  getGuardStore(0).Send(res);
+  if (!topic_.empty()) {
+    getGuardStore(0).Send(topic_, res, 0);
+  }
 }
 
 std::string getTimeStr(const NET_DVR_TIME &netTime) {
@@ -164,7 +173,7 @@ void CALLBACK DecCBFun(int nPort,
         if (pos != -1) {
           task->setPos(pos);
         }
-        std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getTaskId(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
+        std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getTaskId(), task->getTopic(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
         executorService->Execute(std::move(decodeTask));
       }
      

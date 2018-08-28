@@ -115,6 +115,14 @@ class PlayTask {
     int getPos() {
       return vide.pos;
     }
+
+    std::string &getTopic() {
+      return topic;
+    }
+
+    void setTopic(const std::string &topic) {
+      this->topic = topic;
+    }
     
   private:
     int taskId;
@@ -128,6 +136,7 @@ class PlayTask {
     int dePort;
     volatile PlayTaskStatus status;
     PlayType playType;
+    std::string topic;
 };
 
 class DVRControl {
