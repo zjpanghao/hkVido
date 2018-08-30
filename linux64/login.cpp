@@ -1,5 +1,5 @@
 #include "login.h"
-#include "HCNetSDK.h"
+
 #include "time.h"
 #include <stdlib.h>
 #include <string.h>
@@ -42,10 +42,8 @@ int LoginControl::login(HKUser *user) {
   strcpy(struLoginInfo.sUserName, user->userName.c_str()); 
   strcpy(struLoginInfo.sPassword, user->password.c_str()); 
 
-  LONG lUserID = 0;
-
+  LONG lUserID = 0; 
   NET_DVR_DEVICEINFO_V40 struDeviceInfoV40 = {0};
-
   lUserID = NET_DVR_Login_V40(&struLoginInfo, &struDeviceInfoV40);
   if (lUserID < 0) {
     printf("Login failed, error code: %d\n", NET_DVR_GetLastError());
@@ -59,7 +57,18 @@ int LoginControl::login(HKUser *user) {
   user->token = tmp;
   std::lock_guard<std::mutex> guard(lock);
   userMap[lUserID] = now;
+  devInfo = struDeviceInfoV40;
+  islogin = true;
   return 0;
+}
+
+bool LoginControl::getDevInfo(NET_DVR_DEVICEINFO_V40 *struDeviceInfoV40) {
+  std::lock_guard<std::mutex> guard(lock);
+  if (!islogin) {
+    return false;
+  }
+  *struDeviceInfoV40 = devInfo;
+  return true;
 }
 
 std::string LoginControl::showOnLineUser() {
