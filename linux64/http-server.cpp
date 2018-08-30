@@ -210,8 +210,9 @@ static void playback(struct evhttp_request *req, void *arg) {
   evhttp_parse_query(buffer, &keys);
   const char *taskId = evhttp_find_header(&keys, "taskId");
   const char *userId = evhttp_find_header(&keys, "userId");
-  if (taskId == NULL || userId == NULL) {
-    evbuffer_add_printf(response, "not contain taskId or userId");
+  const char *topic = evhttp_find_header(&keys, "topic");
+  if (taskId == NULL || userId == NULL || topic == NULL) {
+    evbuffer_add_printf(response, "not contain taskId or userId or topic");
     evhttp_send_reply(req, 200, "OK", response);
     return;
   }
@@ -242,6 +243,7 @@ static void playback(struct evhttp_request *req, void *arg) {
     return;
   }
   PlayTask playTask(task, user, channel, start, end);
+  playTask.setTopic(topic);
   if (!getDVRControl().addTask(&playTask)) {
     evbuffer_add_printf(response, "task already exits or channel error");
     evhttp_send_reply(req, 200, "OK", response);
