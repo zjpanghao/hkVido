@@ -243,7 +243,9 @@ static void playback(struct evhttp_request *req, void *arg) {
     return;
   }
   PlayTask playTask(task, user, channel, start, end);
-  playTask.setTopic(topic);
+  if (topic) {
+    playTask.setTopic(topic);
+  }
   if (!getDVRControl().addTask(&playTask)) {
     evbuffer_add_printf(response, "task already exits or channel error");
     evhttp_send_reply(req, 200, "OK", response);
@@ -272,6 +274,7 @@ static void playReal(struct evhttp_request *req, void *arg) {
   evhttp_parse_query(buffer, &keys);
   const char *taskId = evhttp_find_header(&keys, "taskId");
   const char *userId = evhttp_find_header(&keys, "userId");
+  const char *topic = evhttp_find_header(&keys, "topic");
   const char *streamType = evhttp_find_header(&keys, "stream");
   if (taskId == NULL || userId == NULL) {
     evbuffer_add_printf(response, "not contain taskId or userId");
@@ -293,6 +296,9 @@ static void playReal(struct evhttp_request *req, void *arg) {
     channel = atol(channelId);
   }
   PlayTask playTask(task, user, channel);
+  if (topic) {
+    playTask.setTopic(topic);
+  }
   playTask.setStreamType(stream);
   if (!getDVRControl().addTask(&playTask)) {
     evbuffer_add_printf(response, "task already exits");

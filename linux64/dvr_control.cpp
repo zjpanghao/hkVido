@@ -46,7 +46,10 @@ PlayTask::PlayTask(int taskId, int userId, int channel, long start, long end) {
   bool DVRControl::addTask(PlayTask *playTask) {
    ChannelInfo info = {0};
    getChannelControl().getChannelInfo(playTask->getChannel(), &info);
-   if (info.channelStat.stat != 0 || info.channelStat.stat == false) {
+   if (info.channelStat.stat != 0) {
+     return false;
+   }
+   if (playTask->getPlayType() == PlayType::PLAYBACK && !info.channelStat.recordStat) {
      return false;
    }
    std::lock_guard<std::mutex> guard(lock);

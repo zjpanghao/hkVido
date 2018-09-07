@@ -70,7 +70,7 @@ bool hasFilePlay(int lUserId, int channel, long startTime, long endTime) {
   //²éÕÒÂ¼ÏñÎÄ¼ş
   int lFindHandle = NET_DVR_FindFile_V40(lUserId, &struFileCond);
   if(lFindHandle < 0) {
-      printf("find file fail,last error %d\n",NET_DVR_GetLastError());
+      LOG(ERROR) << "find file fail,last error: " << NET_DVR_GetLastError();
       return false;
   }
   NET_DVR_FINDDATA_V40 struFileData;
