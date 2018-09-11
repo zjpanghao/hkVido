@@ -21,7 +21,7 @@ int LoginControl::logout(int userId) {
       return -1;
     }
     std::string &ip = it->second.nvrIp;
-    SdkApi *api = getSdkApi(ip);
+    api = getSdkApi(ip);
     if (!api) {
       return -1;
     }
@@ -37,7 +37,7 @@ void LoginControl::userHeartCheck() {
   auto it = userMap.begin();
   while (it != userMap.end()) {
   long time = it->second.time;
-  if (current - time > 1200) {
+  if (current - time > 3600 *24) {
     LOG(INFO) << "user " <<  it->first << "timeout";
     std::string &ip = it->second.nvrIp;
     SdkApi *api = getSdkApi(ip);
