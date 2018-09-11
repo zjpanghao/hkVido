@@ -2,17 +2,8 @@
 #define INCLUDE_PLAY_H
 #include "HCNetSDK.h"
 #include "threadpool/thread_pool.h"
+#include "sdk_common.h"
 class PlayTask;
-
-enum PlayType {
-  PLAYREAL,
-  PLAYBACK
-};
-
-enum StreamType {
-  MAIN_STREAM,
-  CHILD_STREAM
-};
   
 class DecodeTask : public Runnable {
  public:
@@ -31,12 +22,11 @@ class DecodeTask : public Runnable {
   int height_;
 };
 
-int playByTime(int lUserID, int channelId, NET_DVR_TIME *dvrStartTime, NET_DVR_TIME *dvrEndTime, PlayTask *playTask);
 int playReal(PlayTask *playTask);
 int stopPlay(int handle, int port, PlayType type);
 int playBackControl(int handle, int flag, long param);
 int playGetPos(int handle, int *pos);
-int playBackSetStartTime(int handle);
 void exeServiceInit();
 bool hasFilePlay(int lUserId, int channel, long startTime, long endTime);
+ExecutorService *getPlayService();
 #endif

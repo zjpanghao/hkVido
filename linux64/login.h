@@ -3,33 +3,37 @@
 #include <map>
 #include <mutex>
 #include <string>
-#include "HCNetSDK.h"
-struct HKUser {
+#include "sdk_common.h"
+struct SDKUser {
   std::string userName;
   std::string password;
   std::string nvrIp;
   int port;
   std::string token;
   int id;
+  long time;
 };
 
+class SdkApi;
 class LoginControl {
   public:
     LoginControl() :
       islogin(false) {
     }
-    int login(HKUser *user);
+    int login(SDKUser *user);
     int logout(int userId);
     void userHeartCheck();
     void heartBeat(int userId);
     std::string showOnLineUser();
-    bool getDevInfo(NET_DVR_DEVICEINFO_V40 *struDeviceInfoV40);
+    bool getDevInfo(DeviceInfo *info);
+    std::string getIp(int userId);
    
       
   private:
     bool islogin;
-    NET_DVR_DEVICEINFO_V40 devInfo;
-    std::map<int, long> userMap;
+    DeviceInfo devInfo;
+    std::map<int, long> userTimeMap;
+    std::map<int, SDKUser> userMap;
     std::mutex lock;
 };
 

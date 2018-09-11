@@ -237,7 +237,7 @@ static void playback(struct evhttp_request *req, void *arg) {
     channel = atol(channelId);
   }
 
-  if (!hasFilePlay(user, channel, start, end)) {
+  if (!getDVRControl().hasFilePlay(user, channel, start, end)) {
     evbuffer_add_printf(response, "{\"error_code\":%d}", -100);
     evhttp_send_reply(req, 200, "OK", response);
     return;
@@ -391,7 +391,7 @@ login_request_cb(struct evhttp_request *req, void *arg)
     port = evhttp_find_header(&keys, "port");
   }
   
-  HKUser hkUser = { userName ? userName : "admin", 
+  SDKUser hkUser = { userName ? userName : "admin", 
                     pass ? pass : "ky221data", 
                     ip ? ip : "192.168.2.3", 
                     port ? atoi(port) : 8000
