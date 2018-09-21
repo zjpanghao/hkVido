@@ -78,7 +78,8 @@ void DecodeTask::Run() {
   if (image.empty()) {
     return;
   }
-  base64Encry((char*)&image[0], image.size(), &imageBase64);
+  imageBase64 = Base64::getBase64().encode(image);
+  // base64Encry((char*)&image[0], image.size(), &imageBase64);
   PLAYM4_SYSTEM_TIME playm4SystemTime;
   PlayM4_GetSystemTime(nPort, &playm4SystemTime);
   // LOG(INFO) << channel;

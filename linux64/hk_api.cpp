@@ -141,7 +141,7 @@ int HkApi::login(SDKUser * user, DeviceInfo *info) {
   lUserID = NET_DVR_Login_V40(&struLoginInfo, &struDeviceInfoV40);
   if (lUserID < 0) {
     LOG(ERROR) << "Login failed, error code: " << NET_DVR_GetLastError();
-    return NET_DVR_GetLastError();
+    return -1;
   }
   user->id = lUserID;
   return 0;
