@@ -10,8 +10,17 @@ enum StreamType {
   CHILD_STREAM
 };
 
-class DeviceInfo {
+enum FactoryType {
+  HAIKANG,
+  DAHUA
+};
 
+struct DeviceInfo {
+  unsigned char type;
+  unsigned char byChanNum;                    //模拟通道个数
+  unsigned char byStartChan;
+  unsigned char byIPChanNum;
+  unsigned char byStartDChan;
 };
 
 enum PlayTaskStatus {

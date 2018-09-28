@@ -4,8 +4,9 @@
 #include <map>
 #include <string>
 #include "login.h"
+#include "channel.h"
 #include <glog/logging.h>
-std::map<std::string, SdkApi *> *sdkApiMap;
+std::map<std::string, SdkApi*> *sdkApiMap;
 
 static void attach(std::vector<SDKUser*> *userList, std::map<std::string, SdkApi*> *map) {
   HkApi *api = new HkApi();
@@ -15,7 +16,8 @@ static void attach(std::vector<SDKUser*> *userList, std::map<std::string, SdkApi
      if (api->login(user, &info) >= 0) {
        (*sdkApiMap)[user->nvrIp] = api;
        LOG(INFO) << "attach " << user->nvrIp;
-       api->logout(user->id);
+       // api->logout(user->id);
+       getChannelControl().add(user, FactoryType::HAIKANG, info);
      } 
   }
 }

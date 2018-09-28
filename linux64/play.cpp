@@ -22,13 +22,19 @@
 #include "sdk_common.h"
 #include "sdk_api.h"
 using namespace cv;
-static ExecutorService *executorService;
+#define MAX_THREAD_NUM 16
+static ExecutorService *executorService[MAX_THREAD_NUM];
 void exeServiceInit() {
-  executorService = Executors::NewFixPool(10);
+  for(int i = 0; i < MAX_THREAD_NUM; i++) {
+    executorService[i] = Executors::NewFixPool(1);
+  }
 }
 
-ExecutorService *getPlayService() {
-  return executorService;
+ExecutorService *getPlayService(int i) {
+  if (i < 0 || i >= MAX_THREAD_NUM) {
+    return NULL;
+  }
+  return executorService[i];
 }
 
 bool YV12ToBGR24_OpenCV(unsigned char* pYUV,std::vector<unsigned char> *inImage,int width,int height) {
@@ -41,30 +47,12 @@ bool YV12ToBGR24_OpenCV(unsigned char* pYUV,std::vector<unsigned char> *inImage,
     return true;
 }
 
-static std::string getSerial(int taskId, 
-  const PLAYM4_SYSTEM_TIME &playm4SystemTime, 
-  const std::string &data) {
-  Json::Value root;
-  //root["channel"] = channel;
-  root["data"] = data;
-  root["taskId"] = taskId;
-  //root["type"] = (int)playType;
-  // root["time"] = getPlayTimeStr(playm4SystemTime);
-  // LOG(INFO) << getPlayTimeStr(playm4SystemTime);
-  return root.toStyledString();
-}
-
 DecodeTask::DecodeTask(
-  int port,  
-  int taskId, 
-  const std::string topic,
-  const char *buf, 
-  int size, 
-  int width, 
-  int height)
-    : nPort(port),taskId_(taskId), topic_(topic), size_(size), pbuf_(NULL), width_(width), height_(height) {
-  pbuf_ = (char*)malloc(size);
-  memcpy(pbuf_, buf, size);
+ const TaskParam &param)
+    :  pbuf_(NULL), param_(param) {
+  
+  pbuf_ = (char*)malloc(param.size);
+  memcpy(pbuf_, param.buf, param.size);
 }
 
 DecodeTask::~DecodeTask() {
@@ -73,19 +61,24 @@ DecodeTask::~DecodeTask() {
 
 void DecodeTask::Run() {
   std::vector<unsigned char> image;
-  YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &image, width_, height_);
+  YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &image, param_.width, param_.height);
   std::string imageBase64;
   if (image.empty()) {
     return;
   }
   imageBase64 = Base64::getBase64().encode(image);
-  // base64Encry((char*)&image[0], image.size(), &imageBase64);
-  PLAYM4_SYSTEM_TIME playm4SystemTime;
-  PlayM4_GetSystemTime(nPort, &playm4SystemTime);
-  // LOG(INFO) << channel;
-  String res = getSerial(taskId_, playm4SystemTime, imageBase64);
-  if (!topic_.empty()) {
-    getGuardStore(0).Send(topic_, res, 0);
+  Json::Value root;
+  root["bufferedImageStr"] = imageBase64;
+  root["taskId"] = param_.taskId;
+  //root["type"] = (int)playType;
+  // root["stamp"] = (unsigned int)(param_.api)->getTimeStamp(param_.port);
+  root["stamp"] = (unsigned int)(param_.timestamp);
+  root["cameraId"] = param_.cameraId;
+  root["cameraName"] = param_.cameraName;
+  root["area"] = param_.areaName;
+  String res = root.toStyledString();
+  if (!param_.topic.empty()) {
+    getGuardStore(0).Send(param_.topic, res, 0);
   }
 }
 

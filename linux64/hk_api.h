@@ -21,5 +21,7 @@ class HkApi : public SdkApi {
                           FRAME_INFO * pFrameInfo, 
                           void *puser,
                           int nReserved2);
+    virtual long getTimeStamp(int nPort);
+    void getChannelIp(int userId, std::map<int, std::string> *channelIpMp);
 };
 #endif

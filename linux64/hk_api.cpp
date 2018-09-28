@@ -28,26 +28,30 @@ void CALLBACK HkApi::DecCBFun(int nPort,
                           FRAME_INFO * pFrameInfo, 
                           void *puser,
                           int nReserved2) { 
-    //LOG(INFO) << "DBFUNC" << nPort;
+    
     PlayTask *task = (PlayTask*)puser;
     if (task->getStatus() == PlayTaskStatus::STOP) {
       return;
     }
-    
+    SdkApi *api = task->getSdkApi();
     long lFrameType = pFrameInfo->nType;
     if (lFrameType ==T_AUDIO16) {
-        //printf("Audio nStamp:%d\n",pFrameInfo->nStamp);
+      
     } else if(lFrameType ==T_YV12) {	
-      // LOG(INFO) << "YV12FRame" << pFrameInfo->nWidth << " " << pFrameInfo->nHeight;
       std::vector<unsigned char> inImage;
       if (nSize > 0) {
-        int pos = 0;
-        // playGetPos(task->getPlayHandle(), &pos);
-        if (pos != -1) {
-          task->setPos(pos);
+        if (task->getPlayType() == PlayType::PLAYBACK) {
+          int pos = 0;
+          api->playGetPos(task->getPlayHandle(), &pos);
+          if (pos != -1) {
+            task->setPos(pos);
+          }  
         }
-        std::unique_ptr<Runnable> decodeTask (new DecodeTask(nPort, task->getTaskId(), task->getTopic(), pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight));
-        getPlayService()->Execute(std::move(decodeTask));
+        TaskParam param_ = {task->getSdkApi(), nPort, task->getTaskId(), task->getTopic(),
+        pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight,
+        api->getTimeStamp(nPort), task->getCameraId(), task->getCameraName(), task->getAreaName()};
+        std::unique_ptr<Runnable> decodeTask (new DecodeTask(param_));
+        getPlayService(param_.taskId & 0xf)->Execute(std::move(decodeTask));
       }
      
     } else {
@@ -59,9 +63,8 @@ void HkApi::hkDataCallBack(LONG handle, DWORD dataType, BYTE *buffer, DWORD size
   int rc;
   PLAYM4_HWND hwnd = 0;
   PlayTask *task = (PlayTask*)puser;
-  int status = task->getStatus();
   if (task->getStatus() == PlayTaskStatus::STOP) {
-      return;
+    return;
   }
   int nPort = task->getDePort();
   int maxCount = 3;
@@ -111,7 +114,7 @@ void HkApi::hkDataCallBack(LONG handle, DWORD dataType, BYTE *buffer, DWORD size
     			inData=PlayM4_InputData(nPort,buffer, size);
         }
         if (!inData) {
-          LOG(ERROR) << "input data error" <<  PlayM4_GetLastError(nPort);
+          LOG(ERROR) << "input data error handle:" << handle <<"error " << PlayM4_GetLastError(nPort);
         }
         task->addBytes(size / 1024);
     	}
@@ -143,6 +146,11 @@ int HkApi::login(SDKUser * user, DeviceInfo *info) {
     LOG(ERROR) << "Login failed, error code: " << NET_DVR_GetLastError();
     return -1;
   }
+  info->type = struDeviceInfoV40.struDeviceV30.byDVRType;
+  info->byChanNum = struDeviceInfoV40.struDeviceV30.byStartChan;
+  info->byStartChan = struDeviceInfoV40.struDeviceV30.byStartChan;
+  info->byIPChanNum = struDeviceInfoV40.struDeviceV30.byIPChanNum;
+  info->byStartDChan = struDeviceInfoV40.struDeviceV30.byStartDChan;
   user->id = lUserID;
   return 0;
 }
@@ -155,37 +163,50 @@ int HkApi::logout(int userId) {
 }
 
 int HkApi::stopPlay(int handle, int port, PlayType type) {
-   if (type == PlayType::PLAYBACK) {
+  int rc = 0;
+  if (handle < 0) {
+    return 0;
+  }
+  if (type == PlayType::PLAYBACK) {
     int idx = NET_DVR_GetPlayBackPlayerIndex(handle);
-    PlayM4_SetDecCallBack(idx, NULL);
-    NET_DVR_PlayBackControl(handle, NET_DVR_PLAYSTOPAUDIO, 0, NULL);
-    if (!NET_DVR_StopPlayBack(handle)) {
-      printf("control  failed, error code: %d\n", NET_DVR_GetLastError());
-      return NET_DVR_GetLastError();
+    if (idx >= 0) {
+      PlayM4_SetDecCallBack(idx, NULL);
+      NET_DVR_PlayBackControl(handle, NET_DVR_PLAYSTOPAUDIO, 0, NULL);
+      if (!NET_DVR_StopPlayBack(handle)) {
+        LOG(ERROR) << "stop playback  failed, error code: " << (rc = PlayM4_GetLastError(port));
+        return rc;
+      }
+      LOG(INFO) << "hk stop playback handle: " << handle;
     }
   } else if (type == PlayType::PLAYREAL) {
     if (!NET_DVR_StopRealPlay(handle)) {
-     printf("control  failed, error code: %d\n", NET_DVR_GetLastError());
-      return NET_DVR_GetLastError();
+       LOG(ERROR) << "stop realplay  failed, error code:" << (rc = PlayM4_GetLastError(port));
+       return rc;
     }
+    LOG(INFO) << "hk stop play real handle :" << handle;
   }
 
   if (port != -1) {
     if (!PlayM4_Stop(port)) {
-       printf("stop play error %d\n", PlayM4_GetLastError(port));
-       return PlayM4_GetLastError(port);
+       LOG(ERROR) << "m4stop play error code" <<  (rc = PlayM4_GetLastError(port));
+    }
+
+    if (!PlayM4_CloseStream(port)) {
+      LOG(ERROR) << "m4close stream error code" <<  (rc = PlayM4_GetLastError(port));
     }
     
     if (!PlayM4_FreePort(port)) {
-       return PlayM4_GetLastError(port);
+       LOG(ERROR) << "m4close stream error code" <<  (rc = PlayM4_GetLastError(port));
     }
   }
-  return 0;
+ 
+  return rc;
 }
 
 int HkApi::playByTime(PlayTask *playTask) {
   struct tm start;
   struct tm end;
+  int rc = 0;
   localtime_r(&playTask->getVide().startTime, &start);
   localtime_r(&playTask->getVide().endTime, &end);
   NET_DVR_TIME   dvrStartTime = {start.tm_year + 1900, 
@@ -198,20 +219,20 @@ int HkApi::playByTime(PlayTask *playTask) {
   LONG lid = NET_DVR_PlayBackByTime(playTask->getUserId(), playTask->getChannel(), &dvrStartTime, &dvrEndTime, NULL);
 
   if (lid == -1) {
-    printf("get playbytime failed, error code: %d\n", NET_DVR_GetLastError());
-    return NET_DVR_GetLastError();
+    LOG(ERROR) << "get playbytime failed, error code:" << (rc = NET_DVR_GetLastError());
+    return rc;
   }
-
-  playTask->setPlayHandle(lid);
 
   if (!NET_DVR_SetPlayDataCallBack_V40(lid, hkDataCallBack, (void*)playTask)) {
-    printf("save data failed, error code: %d\n", NET_DVR_GetLastError());
-    return NET_DVR_GetLastError();
+    LOG(ERROR) << "NET_DVR_SetPlayDataCallBack_V40 FAILED, error code:" << (rc = NET_DVR_GetLastError());
+    return rc;
   }
   if (!NET_DVR_PlayBackControl_V40(lid, NET_DVR_PLAYSTART, NULL, 0, NULL, NULL)) {
-    printf("control  failed, error code: %d\n", NET_DVR_GetLastError());
-    return NET_DVR_GetLastError();
+    LOG(ERROR) << "NET_DVR_PLAYSTART  failed, error code: " << (rc=NET_DVR_GetLastError());
+    NET_DVR_StopPlayBack(lid);
+    return rc;
   }
+  playTask->setPlayHandle(lid);
   playTask->setStatus(PlayTaskStatus::START);
   return 0;
 
@@ -251,6 +272,7 @@ int HkApi::playReal(PlayTask *playTask) {
   
 //启动预览并设置回调数据流
   LONG lid;
+  int rc = 0;
   NET_DVR_PREVIEWINFO struPreviewInfo = {0};
   struPreviewInfo.lChannel = playTask->getChannel();
   struPreviewInfo.dwStreamType = playTask->getStreamType();
@@ -259,11 +281,9 @@ int HkApi::playReal(PlayTask *playTask) {
   struPreviewInfo.bPassbackRecord  = 1;
   lid = NET_DVR_RealPlay_V40(playTask->getUserId(), &struPreviewInfo, hkDataCallBack, (void*)playTask);
   if (lid < 0) {
-    printf("get play real handle failed, error code: %d\n", NET_DVR_GetLastError());
-    return NET_DVR_GetLastError();
-  } else {
-     printf("get play real handle success\n");
-  }
+    LOG(ERROR) << "get play real handle failed, error code: " << (rc = NET_DVR_GetLastError());
+    return rc;
+  } 
   playTask->setPlayHandle(lid);
   playTask->setStatus(PlayTaskStatus::START);
   return 0;
@@ -318,6 +338,57 @@ bool HkApi::hasFilePlay(int lUserId, int channel, long startTime, long endTime) 
   return false;
 }
 
+void HkApi::getChannelIp(int userId, std::map<int, std::string> *channelIpMp) {
+  NET_DVR_IPPARACFG_V40 IPAccessCfgV40;
+  BYTE byIPID,byIPIDHigh;
+  int iDevInfoIndex, iGroupNO, iIPCh;
+  DWORD dwReturned = 0;
+  memset(&IPAccessCfgV40, 0, sizeof(NET_DVR_IPPARACFG));
+  iGroupNO=0;
+  if (!NET_DVR_GetDVRConfig(userId, NET_DVR_GET_IPPARACFG_V40, 
+    iGroupNO, &IPAccessCfgV40, sizeof(NET_DVR_IPPARACFG_V40), &dwReturned)) {
+      printf("NET_DVR_GET_IPPARACFG_V40 error, %d\n", NET_DVR_GetLastError());
+      return;
+  } else {
+      for (int i=0;i<IPAccessCfgV40.dwDChanNum;i++) {
+              switch(IPAccessCfgV40.struStreamMode[i].byGetStreamType)
+              {
+              case 0:
+                if (IPAccessCfgV40.struStreamMode[i].uGetStream.struChanInfo.byEnable)
+                  {
+                      byIPID=IPAccessCfgV40.struStreamMode[i].uGetStream.struChanInfo.byIPID;
+                      byIPIDHigh=IPAccessCfgV40.struStreamMode[i].uGetStream.struChanInfo.byIPIDHigh;
+                      iDevInfoIndex=byIPIDHigh*256 + byIPID-1-iGroupNO*64;
+                      //strcpy(channels[i + startChannel].ip, IPAccessCfgV40.struIPDevInfo[iDevInfoIndex].struIP.sIpV4);
+                      //printf("IP channel no.%d is online, IP: %s\n", i+1, IPAccessCfgV40.struIPDevInfo[iDevInfoIndex].struIP.sIpV4);
+                      (*channelIpMp)[i] = IPAccessCfgV40.struIPDevInfo[iDevInfoIndex].struIP.sIpV4;
+                  }
+                  break;
+              case 1:  
+                  break;
+              default:
+                  break;
+              }
+      }
+
+  }
+
+}
+
+long HkApi::getTimeStamp(int nPort) {
+  PLAYM4_SYSTEM_TIME playm4SystemTime;
+  PlayM4_GetSystemTime(nPort, &playm4SystemTime);
+  struct tm  playTime = {playm4SystemTime.dwSec, 
+                         playm4SystemTime.dwMin, 
+                         playm4SystemTime.dwHour,
+                         playm4SystemTime.dwDay,
+                         playm4SystemTime.dwMon - 1,
+                         playm4SystemTime.dwYear - 1900
+                         };
+  return mktime(&playTime);
+  
+}
+
 
 static std::string getPlayTimeStr(const PLAYM4_SYSTEM_TIME &playm4SystemTime) {
    char buf[64];
@@ -332,15 +403,3 @@ static std::string getPlayTimeStr(const PLAYM4_SYSTEM_TIME &playm4SystemTime) {
 
 }
 
-static std::string getSerial(int taskId, 
-  const PLAYM4_SYSTEM_TIME &playm4SystemTime, 
-  const std::string &data) {
-  Json::Value root;
-  //root["channel"] = channel;
-  root["data"] = data;
-  root["taskId"] = taskId;
-  //root["type"] = (int)playType;
-  root["time"] = getPlayTimeStr(playm4SystemTime);
-  LOG(INFO) << getPlayTimeStr(playm4SystemTime);
-  return root.toStyledString();
-}

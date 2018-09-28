@@ -37,7 +37,7 @@ class DVRControl {
     std::map<int, PlayTask> playTaskMap;
     std::map<int, long> userMap;
     std::mutex lock;
-    static constexpr int TASK_TIMEOUT_SECONDS{3600 *5};
+    static constexpr int TASK_TIMEOUT_SECONDS{60 *1};
     
 };
 

@@ -4,29 +4,34 @@
 #include "threadpool/thread_pool.h"
 #include "sdk_common.h"
 class PlayTask;
-  
+class SdkApi;
+struct TaskParam{
+  SdkApi *api;
+  int port;
+  int taskId;
+  std::string topic;
+  const char *buf;
+  int size;
+  int width;
+  int height;
+  long timestamp;
+  int cameraId;
+  std::string cameraName;
+  std::string areaName;
+};
 class DecodeTask : public Runnable {
  public:
-  // DecodeTask(int port, int channel, PlayType playType, const std::vector<unsigned char> &image);
-  DecodeTask(int port, int taskId, const std::string topic, const char *buf, int size, int width, int height);
+  DecodeTask(const TaskParam &param);
   void Run();
   virtual ~DecodeTask();
   
  private:
-  int nPort;
-  int taskId_;
-  std::string topic_;
+  TaskParam param_;
   char *pbuf_;
-  int size_;
-  int width_;
-  int height_;
 };
 
-int playReal(PlayTask *playTask);
-int stopPlay(int handle, int port, PlayType type);
-int playBackControl(int handle, int flag, long param);
 int playGetPos(int handle, int *pos);
 void exeServiceInit();
 bool hasFilePlay(int lUserId, int channel, long startTime, long endTime);
-ExecutorService *getPlayService();
+ExecutorService *getPlayService(int i);
 #endif

@@ -2,7 +2,7 @@
 PlayTask::PlayTask() {
 }
 
-PlayTask::PlayTask(int taskId, int userId, int channel) {
+PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type) {
   this->channel = channel;
   this->taskId = taskId;
   this->startTime = time(NULL);
@@ -12,23 +12,16 @@ PlayTask::PlayTask(int taskId, int userId, int channel) {
   this->userId = userId;
   this->inputByte = 0;
   this->playHandle = -1;
-  this->playType = PlayType::PLAYREAL;
+  this->playType = type;
   this->vide.dwStreamType = StreamType::CHILD_STREAM;
   dePort = -1;
   status = PlayTaskStatus::STOP;
+  cameraName = " ";
+  areaName = " ";
+  topic="";
 }
 
-PlayTask::PlayTask(int taskId, int userId, int channel, long start, long end) {
-  this->channel = channel;
-  this->taskId = taskId;
-  this->startTime = time(NULL);
-  this->updateTime = time(NULL);
+PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type, long start, long end) :PlayTask(taskId, userId, channel, type) {
   this->vide.startTime = start;
   this->vide.endTime = end;
-  this->userId = userId;
-  this->inputByte = 0;
-  this->playHandle = -1;
-  dePort = -1;
-  this->playType = PlayType::PLAYBACK;
-  status = PlayTaskStatus::STOP;
 }

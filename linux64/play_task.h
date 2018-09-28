@@ -13,11 +13,14 @@ struct VideInfo {
   StreamType dwStreamType;
 };
 
+class SdkApi;
 class PlayTask {
   public:
     PlayTask();
-    PlayTask(int taskId, int userId, int channel);
-    PlayTask(int taskId, int userId, int channel, long start, long end);
+
+    PlayTask(int taskId, int userId, int channel, PlayType type);
+
+    PlayTask(int taskId, int userId, int channel, PlayType type, long start, long end);
 
     int getTaskId()    const {
       return taskId;
@@ -114,6 +117,37 @@ class PlayTask {
     void setTopic(const std::string &topic) {
       this->topic = topic;
     }
+
+    void setSdkApi(SdkApi *api) {
+      this->api = api;
+    }
+    void setCameraId(int id) {
+      this->cameraId = id;
+    }
+
+    void setCameraName(std::string cameraName) {
+      this->cameraName = cameraName;
+    }
+
+    void setAreaName(std::string areaName) {
+      this->areaName = areaName;
+    }
+
+    int getCameraId() {
+      return cameraId;
+    }
+
+    std::string getCameraName() {
+      return cameraName;
+    }
+
+    std::string getAreaName() {
+      return areaName;
+    }
+
+    SdkApi *getSdkApi() {
+      return api;
+    }
     
   private:
     int taskId;
@@ -128,5 +162,9 @@ class PlayTask {
     volatile PlayTaskStatus status;
     PlayType playType;
     std::string topic;
+    int cameraId;
+    std::string cameraName;
+    std::string areaName;
+    SdkApi *api;
 };
 #endif

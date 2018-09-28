@@ -13,7 +13,7 @@ DVRControl & getDVRControl() {
 
   bool DVRControl::addTask(PlayTask *playTask) {
    ChannelInfo info = {0};
-   getChannelControl().getChannelInfo(playTask->getChannel(), &info);
+   // getChannelControl().getChannelInfo(playTask->getChannel(), &info);
    if (info.channelStat.stat != 0) {
      return false;
    }
@@ -38,6 +38,7 @@ int DVRControl::play(int taskId) {
   PlayTask &playTask = it->second;
   int rc = 0;
   SdkApi *api = getSdkApi(getLoginControl().getIp(playTask.getUserId()));
+  playTask.setSdkApi(api);
   if (!api) {
     return -1;
   }
@@ -63,6 +64,10 @@ int DVRControl::stopPlayTask(int taskId) {
     std::lock_guard<std::mutex> guard(lock);
     PlayTask *playTask = getPlayTask(taskId);
     if (playTask) {
+      if (playTask->getStatus() == PlayTaskStatus::STOP) {
+          LOG(ERROR) << taskId << "alreay stop";
+          return -1;
+      }
       playTask->setStatus(PlayTaskStatus::STOP);
       sleep(1);
     } else {
@@ -76,6 +81,7 @@ int DVRControl::stopPlayTask(int taskId) {
     if (!api) {
       return -1;
     }
+    LOG(INFO) << "stop task:"<< taskId;
     api->stopPlay(playTask->getPlayHandle(), playTask->getDePort(), playTask->getPlayType());
     playTaskMap.erase(taskId);
   } else {
@@ -97,14 +103,6 @@ int DVRControl::playControl(int taskId, int flag, long param) {
   return -1;
 }
 
-  void DVRControl::addNbytes(int taskId, long nbyte) {
-    std::lock_guard<std::mutex> guard(lock);
-    PlayTask* task = getPlayTask(taskId);
-    if (task) {
-      task->addBytes(nbyte);
-    }
-  }
-
   int DVRControl::getPos(int taskId) {
     int pos = -1;
     std::lock_guard<std::mutex> guard(lock);
@@ -116,6 +114,7 @@ int DVRControl::playControl(int taskId, int flag, long param) {
   }
 
 std::string DVRControl::getTaskInfo() {
+  long now = time(NULL);
   std::lock_guard<std::mutex> guard(lock);
   auto it = playTaskMap.begin();
   std::string result = "taskId, channel, userId, handle, deport, status, pos,inputbytes(kb)  speed(kb/s) <br>";
@@ -146,7 +145,7 @@ std::string DVRControl::getTaskInfo() {
     sprintf(buf ,"%lldkb", playTask.getInputBytes());
     result += buf;
     result += ",";
-    sprintf(buf ,"%lldkb/s", playTask.getInputBytes() / (time(NULL) - playTask.getStartTime()));
+    sprintf(buf ,"%lldkb/s", playTask.getInputBytes() / (now - playTask.getStartTime()));
     result += buf;
     result += "<br>";
     it++;
@@ -167,19 +166,13 @@ std::string DVRControl::getTaskInfo() {
       }
       
       if (task->getStatus() == PlayTaskStatus::START) {
-        task->setStatus(PlayTaskStatus::STOP);
-        LOG(INFO) << "task " <<  it->first << "timeout";
         it++;
-      } else {
-        LOG(INFO) << "task " <<  it->first << "stop";
-        SdkApi *api = getSdkApi(getLoginControl().getIp(task->getUserId()));
-        if (!api) {
-          return;
-        }
-        api->stopPlay(task->getPlayHandle(), task->getDePort(), task->getPlayType());
-        playTaskMap.erase(it++);
-      } 
-   }
+        continue;
+      }   
+      LOG(INFO) << "task " <<  it->first << "clear";
+      // it++;
+      playTaskMap.erase(it++);
+    } 
  }
 
  PlayTask* DVRControl::getPlayTask(int taskId) {
