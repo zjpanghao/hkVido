@@ -23,10 +23,17 @@
 #include "sdk_api.h"
 using namespace cv;
 #define MAX_THREAD_NUM 16
+#define MAX_DECODE_TASK 250
 static ExecutorService *executorService[MAX_THREAD_NUM];
+static ExecutorService *executorServiceMessage[MAX_THREAD_NUM];
+
 void exeServiceInit() {
   for(int i = 0; i < MAX_THREAD_NUM; i++) {
-    executorService[i] = Executors::NewFixPool(1);
+    executorService[i] = Executors::NewFixPool(1, MAX_DECODE_TASK);
+  }
+
+  for(int i = 0; i < MAX_THREAD_NUM; i++) {
+    executorServiceMessage[i] = Executors::NewFixPool(1, MAX_DECODE_TASK);
   }
 }
 
@@ -43,7 +50,10 @@ bool YV12ToBGR24_OpenCV(unsigned char* pYUV,std::vector<unsigned char> *inImage,
     Mat dst(height, width, CV_8UC3);
     Mat src(height + height/2, width, CV_8UC1, pYUV);
     cvtColor(src, dst, CV_YUV2BGR_YV12);
-    imencode(".jpg", dst, *inImage);
+	std::vector<int> param (2, 0); 
+    param[0]=CV_IMWRITE_JPEG_QUALITY; 
+    param[1]=95;//default(95) 0-100 
+    imencode(".jpg", dst, *inImage, param);
     return true;
 }
 
@@ -59,14 +69,21 @@ DecodeTask::~DecodeTask() {
   free(pbuf_);
 }
 
+void DecodeTask::ErrorMsg(int id, const std::string &msg) {
+  LOG(ERROR) << "error " << msg;
+}
+
+
 void DecodeTask::Run() {
+  
   std::vector<unsigned char> image;
   YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &image, param_.width, param_.height);
+  return;
   std::string imageBase64;
   if (image.empty()) {
     return;
   }
-  imageBase64 = Base64::getBase64().encode(image);
+  Base64::getBase64().encode(image, imageBase64);
   Json::Value root;
   root["bufferedImageStr"] = imageBase64;
   root["taskId"] = param_.taskId;
@@ -78,9 +95,27 @@ void DecodeTask::Run() {
   root["area"] = param_.areaName;
   String res = root.toStyledString();
   if (!param_.topic.empty()) {
-    getGuardStore(0).Send(param_.topic, res, 0);
+  	std::unique_ptr<MessageTask> messageTask(new MessageTask(param_.topic, res));
+    executorServiceMessage[param_.taskId & 0xf]->Execute(std::move(messageTask));
   }
 }
 
+MessageTask::MessageTask(const std::string &topic, const std::string &mess) 
+	:topic_(topic),
+	 mess_(mess) {
+}
+
+MessageTask::~MessageTask(){}
+
+void MessageTask::Run() {
+  if (!topic_.empty()) {
+  	// LOG(INFO) << "send to kafka size: " << mess_.size();
+    getGuardStore(0).Send(topic_, mess_, 0);
+  }
+}
+
+void MessageTask::ErrorMsg(int code, const std::string message) {
+  LOG(INFO) <<"topic:" << topic_ << "msg:" << message;
+}
 
 

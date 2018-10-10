@@ -32,6 +32,7 @@ int LoginControl::logout(int userId) {
 }
 
 void LoginControl::userHeartCheck() {
+  return;
   std::lock_guard<std::mutex> guard(lock);
   long current = time(NULL);
   auto it = userMap.begin();

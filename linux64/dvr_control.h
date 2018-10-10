@@ -31,11 +31,13 @@ class DVRControl {
     void taskHeartCheck();
 
     bool hasFilePlay(int lUserId, int channel, long startTime, long endTime);
- 
+
+	PlayTask   *getByTaskId(int taskId);
+	
   private:
     PlayTask* getPlayTask(int taskId);
+	
     std::map<int, PlayTask> playTaskMap;
-    std::map<int, long> userMap;
     std::mutex lock;
     static constexpr int TASK_TIMEOUT_SECONDS{60 *1};
     

@@ -165,7 +165,8 @@ std::string DVRControl::getTaskInfo() {
         continue;
       }
       
-      if (task->getStatus() == PlayTaskStatus::START) {
+      if (task->getStatus() == PlayTaskStatus::START ||
+	  		task->getPlayType() == PlayType::PLAYREAL) {
         it++;
         continue;
       }   
@@ -182,6 +183,11 @@ std::string DVRControl::getTaskInfo() {
     } else {
       return NULL;
     }
+ }
+
+ PlayTask * DVRControl::getByTaskId(int taskId) {
+	std::lock_guard<std::mutex> guard(lock);
+	return getPlayTask(taskId);
  }
 
   void DVRControl::setPlayHandle(int taskId, int handle) {

@@ -24,10 +24,23 @@ class DecodeTask : public Runnable {
   DecodeTask(const TaskParam &param);
   void Run();
   virtual ~DecodeTask();
+  virtual void ErrorMsg(int id, const std::string &msg);
   
  private:
   TaskParam param_;
   char *pbuf_;
+};
+
+class MessageTask : public Runnable {
+ public:
+  MessageTask(const std::string &topic, const      std::string &mess);
+  void Run();
+  virtual void ErrorMsg(int code, const std::string message);
+  virtual ~MessageTask();
+  
+ private:
+  std::string topic_;
+  std::string mess_;
 };
 
 int playGetPos(int handle, int *pos);

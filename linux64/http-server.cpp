@@ -52,6 +52,7 @@
 #include "channel.h"
 #include "json/json.h"
 #include <memory>
+#include "glog/logging.h"
 #ifdef _WIN32
 #ifndef stat
 #define stat _stat
@@ -110,6 +111,16 @@ not_found:
 	return "application/misc";
 }
 
+bool checkIsNum(const char *param) {
+  if (param == NULL) {
+	return false;
+  }
+  while (*param && *param >= '0' && *param <= '9') {
+	param++;
+  }
+  return *param == '\0' ? true : false;
+}
+
 void sendResponse(int errorCode, 
                       std::string msg,  
                       struct evhttp_request *&req, 
@@ -121,6 +132,23 @@ void sendResponse(int errorCode,
     evbuffer_add_printf(response, "%s", s.c_str());
     evhttp_send_reply(req, 200, "OK", response);
 }
+					  
+template<class vvalue>
+void sendResponse(int errorCode, 
+                      std::string msg,
+                      const std::map<std::string, vvalue> &paraMap,
+                      struct evhttp_request *&req, 
+                      evbuffer *&response) {
+    Json::Value root;
+    root["error_code"] = errorCode;
+    root["msg"] = msg;
+	for (auto it = paraMap.begin(); it != paraMap.end(); it++) {
+	  root[it->first] = it->second;
+    }
+    std::string s = root.toStyledString();
+    evbuffer_add_printf(response, "%s", s.c_str());
+    evhttp_send_reply(req, 200, "OK", response);
+}					  
 
 static void heartBeat(struct evhttp_request *req, void *arg) {
   struct evkeyvalq keys;
@@ -159,14 +187,15 @@ static void playcontrol(struct evhttp_request *req, void *arg) {
   const char *flagId = evhttp_find_header(&keys, "flag");
   const char *params  = evhttp_find_header(&keys, "param");
   
-  if (taskId == NULL || flagId == NULL) {
-    sendResponse(rc, "no taskId or flag", req, response);
+  if (!checkIsNum(taskId) || 
+  	!checkIsNum(flagId) || 
+  	(params && !checkIsNum(params))) {
+    sendResponse(rc, "taskId ,flag or params error ", req, response);
     goto DONE;
   }
   
   task = atoi(taskId);
   flag = atoi(flagId);
-;
   if (params != NULL) {
     param = atol(params);
   }
@@ -183,19 +212,32 @@ static void stopplaytask(struct evhttp_request *req, void *arg) {
   struct evkeyvalq keys;
   int rc = 0;
   int task;
+  int userId = -1;
+  PlayTask *playTask = NULL;
   evbuffer *response = evbuffer_new();
   const char *buffer = evhttp_request_uri(req);
   evhttp_parse_query(buffer, &keys);
   const char *taskId = evhttp_find_header(&keys, "taskId");
-  
+  if (!checkIsNum(taskId) ) {
+	sendResponse(rc, "taskId ,flag or params error ", req, response);
+	goto DONE;
+  }
   if (taskId == NULL) {
     sendResponse(-1, "not contain taskId", req, response);
     goto DONE;
   }
   task = atoi(taskId);
+  playTask = 
+  	getDVRControl().getByTaskId(task);
+  if (playTask == NULL) {
+	sendResponse(-1, "no such task or task may already be closed ", req, response);
+	goto DONE;
+  }
+  
   if ((rc = getDVRControl().stopPlayTask(task)) != 0) {
     sendResponse(rc, "stop play failed", req, response);
   }  else {
+  	getLoginControl().logout(userId);
     sendResponse(0, "OK", req, response);
   }
  DONE:
@@ -221,11 +263,17 @@ static void playback(struct evhttp_request *req, void *arg) {
   int user;
   int channel = 1;
   std::unique_ptr<PlayTask> playTaskPtr;
-  
-  if (taskId == NULL || userId == NULL || topic == NULL) {
-    sendResponse(-1, "not contain taskId or userId or topic", req, response);
+
+  if (!checkIsNum(taskId) || 
+  	!checkIsNum(userId) || 
+  	(endTime && !checkIsNum(endTime)) ||
+  	(startTime && !checkIsNum(startTime)) ||
+  	(endTime && !checkIsNum(endTime)) ||
+  	(topic == NULL)) {
+    sendResponse(rc, "taskId ,userid, startTime endTime or topic error ", req, response);
     goto DONE;
   }
+  
   task = atoi(taskId);
   user = atoi(userId);
   if (startTime != NULL) {
@@ -246,24 +294,22 @@ static void playback(struct evhttp_request *req, void *arg) {
   }
 
   playTaskPtr.reset(new PlayTask(task, user, channel, PlayType::PLAYBACK,start, end));
-  
-    //PlayTask playTask(task, user, channel, start, end);
-    if (topic) {
-      playTaskPtr->setTopic(topic);
-    }
-    if (!getDVRControl().addTask(playTaskPtr.get())) {
-      sendResponse(-3, "add task failed", req, response);
-      goto DONE;
-    }
-    
-    if ((rc = getDVRControl().play(task)) != 0) {
-      sendResponse(rc, "play failed", req, response);
-    }  else {
-      evbuffer_add_printf(response, "{\"playok\":%d}", task);
-      evhttp_send_reply(req, 200, "OK", response);
-    }
-  
-  
+
+	if (topic) {
+	  playTaskPtr->setTopic(topic);
+	}
+	if (!getDVRControl().addTask(playTaskPtr.get())) {
+	  sendResponse(-3, "add task failed", req, response);
+	  goto DONE;
+	}
+
+	if ((rc = getDVRControl().play(task)) != 0) {
+	  sendResponse(rc, "play failed", req, response);
+	}  else {
+	  evbuffer_add_printf(response, "{\"playok\":%d}", task);
+	  evhttp_send_reply(req, 200, "OK", response);
+	}
+
 	DONE:
     evhttp_clear_headers(&keys);
 }
@@ -279,6 +325,9 @@ static void playReal(struct evhttp_request *req, void *arg) {
   int task;
   int user;
   std::unique_ptr<PlayTask> playTaskPtr;
+  std::map<std::string, int> kmap;
+  std::string key;
+  ChannelDVR *dvr;
   evhttp_parse_query(buffer, &keys);
   const char *taskId = evhttp_find_header(&keys, "taskId");
   const char *userId = evhttp_find_header(&keys, "userId");
@@ -287,12 +336,17 @@ static void playReal(struct evhttp_request *req, void *arg) {
   const char *cameraId = evhttp_find_header(&keys, "cameraId");
   const char *cameraName = evhttp_find_header(&keys, "cameraName");
   const char *areaName = evhttp_find_header(&keys, "area");
-  if (taskId == NULL || userId == NULL) {
-    sendResponse(-1, "not contain taskId or userId", req, response);
+  channelId = evhttp_find_header(&keys, "channel");
+  if (!checkIsNum(taskId) || 
+  	!checkIsNum(userId) || 
+  	!checkIsNum(channelId) ||
+  	(streamType && !checkIsNum(streamType)) ||
+  	(topic == NULL)) {
+    sendResponse(-1
+  	 , "taskId ,userId, channelId or topic error ", req, response);
     goto DONE;
   }
-
-  channelId = evhttp_find_header(&keys, "channel");
+ 
   task = atoi(taskId);
   user = atoi(userId);
 
@@ -300,19 +354,21 @@ static void playReal(struct evhttp_request *req, void *arg) {
     stream = (StreamType)atoi(streamType);
   }
   
-  if (channelId != NULL) {
-    channel = atol(channelId);
-    std::string key = getLoginControl().getIp(user);
-    ChannelDVR *dvr = getChannelControl().getDVR(key);
-    if (dvr == NULL) {
-      sendResponse(-1, "no such user", req, response);
-      goto DONE;
+	channel = atol(channelId);
+	key = getLoginControl().getIp(user);
+	dvr = getChannelControl().getDVR(key);
+	if (dvr == NULL) {
+	  sendResponse(-1, "no such user", req, response);
+	  goto DONE;
+	}
+	if (dvr->getFactoryType() == FactoryType::HAIKANG) {
+	  channel = channel / 100  -1 + dvr->getDevInfo()->byStartDChan;
+	} else {
+		sendResponse(-1
+  	 , "unknown device ", req, response);
+    	goto DONE;
     }
-    if (dvr->getFactoryType() == FactoryType::HAIKANG) {
-      channel = channel / 100  -1 + dvr->getDevInfo()->byStartDChan;
-    }
-  } 
-  
+ 
   playTaskPtr.reset(new PlayTask(task, user, channel, PlayType::PLAYREAL));
   if (topic) {
     playTaskPtr->setTopic(topic);
@@ -335,8 +391,8 @@ static void playReal(struct evhttp_request *req, void *arg) {
   if ((rc = getDVRControl().play(task)) != 0) {
     sendResponse(rc, "play failed", req, response);
   }  else {
-    evbuffer_add_printf(response, "{\"playok\":%d}", task);
-    evhttp_send_reply(req, 200, "OK", response);
+	kmap["playok"] = task;
+  	sendResponse(0, "ok", kmap, req, response);
   }
 	
   DONE:
@@ -377,8 +433,8 @@ static void logout(struct evhttp_request *req, void *arg) {
   const char *buffer = evhttp_request_uri(req);
   evhttp_parse_query(buffer, &keys);
   const char *userId = evhttp_find_header(&keys, "userId");
-  if (userId == NULL) {
-    sendResponse(0, "no user id", req, response);
+  if (!checkIsNum(userId)) {
+    sendResponse(rc, "taskId error ", req, response);
     goto DONE;
   }
   
@@ -394,42 +450,41 @@ static void logout(struct evhttp_request *req, void *arg) {
 /* Callback used for the /dump URI, and for every non-GET request:
  * dumps all information to stdout and gives back a trivial 200 ok */
 static void
-login_request_cb(struct evhttp_request *req, void *arg)
-{
-	struct evkeyvalq keys;
+login_request_cb(struct evhttp_request *req, void *arg) {
+  struct evkeyvalq keys;
   int rc = 0;
+  SDKUser hkUser;
+  std::map<std::string, int> kmap;
   evbuffer *response = evbuffer_new();
   const char *buffer = evhttp_request_uri(req);
-  const char *userName = NULL;
-  const char *pass = NULL;
   const char *ip = NULL;
-  const char *port = NULL;
+  ChannelDVR *dvr = NULL;
   if (buffer != NULL) {
     evhttp_parse_query(buffer, &keys);
-    userName = evhttp_find_header(&keys, "user");
-    pass = evhttp_find_header(&keys, "password");
     ip = evhttp_find_header(&keys, "ip");
-    port = evhttp_find_header(&keys, "port");
-  }
-  
-  SDKUser hkUser = { userName ? userName : "admin", 
-                    pass ? pass : "ky221data", 
-                    ip ? ip : "192.168.2.3", 
-                    port ? atoi(port) : -1
-                    };
-  if (ip) {
-    ChannelDVR *dvr = getChannelControl().getDVR(ip);
-    if (dvr) {
-      hkUser = *dvr->getUser();
-    }
   }
 
-  if ((rc = getLoginControl().login(&hkUser)) != 0) {
-    evbuffer_add_printf(response, "{\"error_code:\"%d}", rc);
-  }  else {
-    evbuffer_add_printf(response, "{\"user_id\":%d}", hkUser.id);
+  if (ip == NULL) {
+    sendResponse(rc, "taskId error ", req, response);
+    goto DONE;
   }
-	evhttp_send_reply(req, 200, "OK", response);
+  
+  dvr = getChannelControl().getDVR(ip);
+  if (dvr) {
+	hkUser = *dvr->getUser();
+  } else {
+	sendResponse(-1, "ip error ", req, response);
+	goto DONE;
+  }
+ 
+  if ((rc = getLoginControl().login(&hkUser)) != 0) {
+    sendResponse(rc, "error", req, response);
+  }  else {
+	kmap["user_id"] = hkUser.id;
+  	sendResponse(0, "ok", kmap, req, response);
+  }
+  DONE:
+    evhttp_clear_headers(&keys);
 }
 
 /* This callback gets invoked when we get any http request that doesn't match
