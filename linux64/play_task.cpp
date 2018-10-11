@@ -1,5 +1,5 @@
 #include "play_task.h"
-PlayTask::PlayTask() {
+PlayTask::PlayTask()    {
 }
 
 PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type) {

@@ -6,6 +6,10 @@
 #include "channel.h"
 #include "play_task.h"
 #include "sdk_api.h"
+#include "base64.h"
+#include "json/json.h"
+#include "store.h"
+#include "store_factory.h"
 DVRControl & getDVRControl() {
   static DVRControl dvrControl;
   return dvrControl;
@@ -47,6 +51,9 @@ int DVRControl::play(int taskId) {
   } else {
     rc = api->playByTime(&playTask);
   }
+  std::thread *tid = new std::thread(sendThd, &playTask);
+  tid->detach();
+  playTask.setSendThdId(tid);
   return rc;
 }
 
@@ -83,7 +90,15 @@ int DVRControl::stopPlayTask(int taskId) {
     }
     LOG(INFO) << "stop task:"<< taskId;
     api->stopPlay(playTask->getPlayHandle(), playTask->getDePort(), playTask->getPlayType());
-    playTaskMap.erase(taskId);
+	#if 0
+	std::thread *tid = playTask->getSendThdId();
+	if (tid) {
+		tid->join();
+		delete tid;
+		tid = NULL;
+	}
+	#endif
+    // playTaskMap.erase(taskId);
   } else {
     return -1;
   }
@@ -165,13 +180,13 @@ std::string DVRControl::getTaskInfo() {
         continue;
       }
       
-      if (task->getStatus() == PlayTaskStatus::START ||
-	  		task->getPlayType() == PlayType::PLAYREAL) {
+      if (task->getStatus() == PlayTaskStatus::START) {
         it++;
         continue;
       }   
       LOG(INFO) << "task " <<  it->first << "clear";
       // it++;
+      delete task->getSendThdId();
       playTaskMap.erase(it++);
     } 
  }
@@ -195,6 +210,15 @@ std::string DVRControl::getTaskInfo() {
     auto it = playTaskMap.find(taskId);
     if (it != playTaskMap.end()) {
       it->second.setPlayHandle(handle);
+    }
+  }
+
+  void DVRControl::addPackToTask(const TaskParam &param) {
+	std::lock_guard<std::mutex> guard(lock);
+    auto it = playTaskMap.find(param.taskId);
+    if (it != playTaskMap.end()) {
+      PlayTask &task = it->second;
+	  task.addPack(param);
     }
   }
 
@@ -227,4 +251,34 @@ void heartBeatCheck() {
     getLoginControl().userHeartCheck();
    
   }
+}
+
+void DVRControl::sendThd(void *param) {
+    sleep(2);
+	PlayTask *task = (PlayTask*)param;
+	TaskParam taskParam;
+	LOG(INFO) << "task start" << task->getTaskId();
+	while (task->getStatus() == PlayTaskStatus::START) {
+		while (task->getPack(taskParam)) {
+		  std::string imageBase64;
+		  if (taskParam.image.empty()) {
+		    continue;
+		  }
+		  LOG(INFO) << "get:" << taskParam.inx;
+		  Base64::getBase64().encode(taskParam.image, imageBase64);
+		  Json::Value root;
+		  root["bufferedImageStr"] = imageBase64;
+		  root["taskId"] = taskParam.taskId;
+		  root["stamp"] = (unsigned int)(taskParam.timestamp);
+		  root["cameraId"] = taskParam.cameraId;
+		  root["cameraName"] = taskParam.cameraName;
+		  root["area"] = taskParam.areaName;
+		  std::string res = root.toStyledString();
+		  if (!taskParam.topic.empty()) {
+		  	std::unique_ptr<MessageTask> messageTask(new MessageTask(taskParam.topic, res));
+		    getStoreService(taskParam.taskId & 0xf)->Execute(std::move(messageTask));
+		 }
+	   } 
+	   sleep(1);
+   }
 }

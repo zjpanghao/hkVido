@@ -1,9 +1,12 @@
 #ifndef INCLUDE_PLAY_TASK_H
 #define INCLUDE_PLAY_TASK_H
 #include <stdio.h>
+#include <map>
 #include <string>
-
+#include <thread>
+#include <vector>
 #include "sdk_common.h"
+#include <glog/logging.h>
 struct VideInfo {
   long startTime;
   long endTime;
@@ -22,6 +25,9 @@ class PlayTask {
 
     PlayTask(int taskId, int userId, int channel, PlayType type, long start, long end);
 
+	~PlayTask() {
+    }
+	
     int getTaskId()    const {
       return taskId;
     }
@@ -148,6 +154,37 @@ class PlayTask {
     SdkApi *getSdkApi() {
       return api;
     }
+
+	bool getPack(TaskParam &pack) {
+	  auto it = packMap_.find(readPackIndex);
+	  if (it != packMap_.end()) {
+		pack = it->second;
+		packMap_.erase(it);
+	    readPackIndex++;
+		return true;
+	  }
+	  return false;
+	}
+
+	void addPack(const TaskParam &pack) {
+	  packMap_[pack.inx] = pack;
+    }
+	
+	int getWritePackIndex() {
+	  return writePackIndex;
+    }
+
+	void setWritePackIndex(int inx) {
+	  writePackIndex = inx;
+    }
+
+	void  setSendThdId(std::thread* id) {
+	  sendThdId = id;
+	}
+
+	std::thread* getSendThdId() {
+	  return sendThdId;
+	}
     
   private:
     int taskId;
@@ -165,6 +202,10 @@ class PlayTask {
     int cameraId;
     std::string cameraName;
     std::string areaName;
+	std::map<int, TaskParam> packMap_;
+	std::thread *sendThdId{NULL};
+	int readPackIndex{0};
+	int writePackIndex{0};
     SdkApi *api;
 };
 #endif

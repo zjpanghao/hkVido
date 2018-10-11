@@ -32,14 +32,18 @@ class DVRControl {
 
     bool hasFilePlay(int lUserId, int channel, long startTime, long endTime);
 
+	void addPackToTask(const TaskParam &param);
+
 	PlayTask   *getByTaskId(int taskId);
+
+	static void sendThd(void *param);
 	
   private:
     PlayTask* getPlayTask(int taskId);
 	
     std::map<int, PlayTask> playTaskMap;
     std::mutex lock;
-    static constexpr int TASK_TIMEOUT_SECONDS{60 *1};
+    static constexpr int TASK_TIMEOUT_SECONDS{120 *1};
     
 };
 

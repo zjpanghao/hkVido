@@ -3,22 +3,10 @@
 #include "HCNetSDK.h"
 #include "threadpool/thread_pool.h"
 #include "sdk_common.h"
+#include <glog/logging.h>
 class PlayTask;
 class SdkApi;
-struct TaskParam{
-  SdkApi *api;
-  int port;
-  int taskId;
-  std::string topic;
-  const char *buf;
-  int size;
-  int width;
-  int height;
-  long timestamp;
-  int cameraId;
-  std::string cameraName;
-  std::string areaName;
-};
+
 class DecodeTask : public Runnable {
  public:
   DecodeTask(const TaskParam &param);
@@ -29,6 +17,8 @@ class DecodeTask : public Runnable {
  private:
   TaskParam param_;
   char *pbuf_;
+  static float jpgQuality_;
+  static float step_;
 };
 
 class MessageTask : public Runnable {
@@ -47,4 +37,6 @@ int playGetPos(int handle, int *pos);
 void exeServiceInit();
 bool hasFilePlay(int lUserId, int channel, long startTime, long endTime);
 ExecutorService *getPlayService(int i);
+ExecutorService *getStoreService(int i);
+
 #endif
