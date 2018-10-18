@@ -15,7 +15,7 @@ DVRControl & getDVRControl() {
   return dvrControl;
 }
 
-  bool DVRControl::addTask(PlayTask *playTask) {
+  bool DVRControl::addTask(std::shared_ptr<PlayTask> playTask) {
    ChannelInfo info = {0};
    // getChannelControl().getChannelInfo(playTask->getChannel(), &info);
    if (info.channelStat.stat != 0) {
@@ -29,7 +29,7 @@ DVRControl & getDVRControl() {
    if (it != playTaskMap.end()) {
      return false;
    }
-   playTaskMap[playTask->getTaskId()] = *playTask;
+   playTaskMap[playTask->getTaskId()] = playTask;
    return true;
   }
 
@@ -39,27 +39,27 @@ int DVRControl::play(int taskId) {
   if (it == playTaskMap.end()) {
     return -1;
   }
-  PlayTask &playTask = it->second;
+  std::shared_ptr<PlayTask> playTask = it->second;
   int rc = 0;
-  SdkApi *api = getSdkApi(getLoginControl().getIp(playTask.getUserId()));
-  playTask.setSdkApi(api);
+  SdkApi *api = getSdkApi(getLoginControl().getIp(playTask->getUserId()));
+  playTask->setSdkApi(api);
   if (!api) {
     return -1;
   }
-  if (playTask.getPlayType() == PlayType::PLAYREAL) {
-    rc = api->playReal(&playTask);
+  if (playTask->getPlayType() == PlayType::PLAYREAL) {
+    rc = api->playReal(playTask.get());
   } else {
-    rc = api->playByTime(&playTask);
+    rc = api->playByTime(playTask);
   }
-  std::thread *tid = new std::thread(sendThd, &playTask);
+  std::thread *tid = new std::thread(sendThd, playTask.get());
   tid->detach();
-  playTask.setSendThdId(tid);
+  playTask->setSendThdId(tid);
   return rc;
 }
 
 int DVRControl::getTaskStatus(int taskId) {
   std::lock_guard<std::mutex> guard(lock);
-  PlayTask *playTask = getPlayTask(taskId);
+  std::shared_ptr<PlayTask> playTask = getPlayTask(taskId);
   if (playTask) {
     return playTask->getStatus();
   }
@@ -69,7 +69,7 @@ int DVRControl::getTaskStatus(int taskId) {
 int DVRControl::stopPlayTask(int taskId) {
   {
     std::lock_guard<std::mutex> guard(lock);
-    PlayTask *playTask = getPlayTask(taskId);
+    auto playTask = getPlayTask(taskId);
     if (playTask) {
       if (playTask->getStatus() == PlayTaskStatus::STOP) {
           LOG(ERROR) << taskId << "alreay stop";
@@ -82,7 +82,7 @@ int DVRControl::stopPlayTask(int taskId) {
     }
   }
   std::lock_guard<std::mutex> guard(lock);
-  PlayTask *playTask = getPlayTask(taskId);
+  auto playTask = getPlayTask(taskId);
   if (playTask) {
     SdkApi *api = getSdkApi(getLoginControl().getIp(playTask->getUserId()));
     if (!api) {
@@ -107,7 +107,7 @@ int DVRControl::stopPlayTask(int taskId) {
 
 int DVRControl::playControl(int taskId, int flag, long param) {
   std::lock_guard<std::mutex> guard(lock);
-  PlayTask *playTask = getPlayTask(taskId);
+  auto playTask = getPlayTask(taskId);
   if (playTask) {
     SdkApi *api = getSdkApi(getLoginControl().getIp(playTask->getUserId()));
     if (!api) {
@@ -121,7 +121,7 @@ int DVRControl::playControl(int taskId, int flag, long param) {
   int DVRControl::getPos(int taskId) {
     int pos = -1;
     std::lock_guard<std::mutex> guard(lock);
-    PlayTask* task = getPlayTask(taskId);
+    auto  task = getPlayTask(taskId);
     if (task) {
       return task->getPos();
     }
@@ -134,7 +134,7 @@ std::string DVRControl::getTaskInfo() {
   auto it = playTaskMap.begin();
   std::string result = "taskId, channel, userId, handle, deport, status, pos,inputbytes(kb)  speed(kb/s) <br>";
   while (it != playTaskMap.end()) {
-    PlayTask playTask = it->second;
+    PlayTask &playTask = *(it->second);
     char buf[64];
     sprintf(buf ,"%d", playTask.getTaskId());
     result += buf;
@@ -173,7 +173,7 @@ std::string DVRControl::getTaskInfo() {
     long current = time(NULL);
     auto it = playTaskMap.begin();
     while (it != playTaskMap.end()) {
-      PlayTask* task = &it->second;
+      std::shared_ptr<PlayTask> task = it->second;
       long time = task->getUpdateTime();
       if (current - time < TASK_TIMEOUT_SECONDS) {
         it++;
@@ -191,16 +191,16 @@ std::string DVRControl::getTaskInfo() {
     } 
  }
 
- PlayTask* DVRControl::getPlayTask(int taskId) {
+ std::shared_ptr<PlayTask> DVRControl::getPlayTask(int taskId) {
     auto it = playTaskMap.find(taskId);
     if (it != playTaskMap.end()) {
-      return &it->second;
+      return it->second;
     } else {
       return NULL;
     }
  }
 
- PlayTask * DVRControl::getByTaskId(int taskId) {
+ std::shared_ptr<PlayTask> DVRControl::getByTaskId(int taskId) {
 	std::lock_guard<std::mutex> guard(lock);
 	return getPlayTask(taskId);
  }
@@ -209,7 +209,7 @@ std::string DVRControl::getTaskInfo() {
     std::lock_guard<std::mutex> guard(lock);
     auto it = playTaskMap.find(taskId);
     if (it != playTaskMap.end()) {
-      it->second.setPlayHandle(handle);
+      it->second->setPlayHandle(handle);
     }
   }
 
@@ -217,8 +217,8 @@ std::string DVRControl::getTaskInfo() {
 	std::lock_guard<std::mutex> guard(lock);
     auto it = playTaskMap.find(param.taskId);
     if (it != playTaskMap.end()) {
-      PlayTask &task = it->second;
-	  task.addPack(param);
+      std::shared_ptr<PlayTask> task = it->second;
+	  task->addPack(param);
     }
   }
 
@@ -233,7 +233,7 @@ bool DVRControl::hasFilePlay(int lUserId, int channel, long startTime, long endT
 
  int DVRControl::heartBeat(int taskId) {
     std::lock_guard<std::mutex> guard(lock);
-    PlayTask* task = getPlayTask(taskId);
+    std::shared_ptr<PlayTask> task = getPlayTask(taskId);
     if (task && task->getStatus() == PlayTaskStatus::START) {
         long current = time(NULL);
         task->setUpdateTime(current);
@@ -255,7 +255,7 @@ void heartBeatCheck() {
 
 void DVRControl::sendThd(void *param) {
     sleep(2);
-	PlayTask *task = (PlayTask*)param;
+	PlayTask *task = (PlayTask *)param;
 	TaskParam taskParam;
 	LOG(INFO) << "task start" << task->getTaskId();
 	while (task->getStatus() == PlayTaskStatus::START) {
@@ -279,6 +279,6 @@ void DVRControl::sendThd(void *param) {
 		    getStoreService(taskParam.taskId & 0xf)->Execute(std::move(messageTask));
 		 }
 	   } 
-	   sleep(1);
+	   std::this_thread::sleep_for(std::chrono::milliseconds(1));
    }
 }

@@ -6,6 +6,7 @@
 #include <vector>
 #include "sdk_common.h"
 class SdkApi;
+class PlayTask;
 enum PlayType {
   PLAYREAL,
   PLAYBACK
@@ -35,6 +36,7 @@ enum PlayTaskStatus {
 };
 
 struct TaskParam{
+  PlayTask *task_;
   SdkApi *api;
   int port;
   int taskId;

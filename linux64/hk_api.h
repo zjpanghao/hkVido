@@ -9,7 +9,7 @@ class HkApi : public SdkApi {
     virtual int login(SDKUser *user, DeviceInfo *info);
     virtual int logout(int userId);
     virtual int stopPlay(int handle, int port, PlayType type);
-    virtual int playByTime(PlayTask *playTask);
+    virtual int playByTime(std::shared_ptr<PlayTask> playTask);
     virtual int playBackControl(int handle, int flag, long param);
     virtual int playReal(PlayTask *playTask);
     virtual int playGetPos(int handle, int *pos);

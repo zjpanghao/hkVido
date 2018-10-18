@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <mutex>
+#include <memory>
 #include "HCNetSDK.h"
 #include "play.h"
 //#include "thread_pool.h"
@@ -11,7 +12,7 @@
 #include "play_task.h"
 class DVRControl {
   public:
-    bool addTask(PlayTask *playTask);
+    bool addTask(std::shared_ptr<PlayTask> playTask);
     int play(int taskId);
     int stopPlayTask(int taskId);
     int playControl(int taskId, int flag, long param);
@@ -34,14 +35,14 @@ class DVRControl {
 
 	void addPackToTask(const TaskParam &param);
 
-	PlayTask   *getByTaskId(int taskId);
+	std::shared_ptr<PlayTask> getByTaskId(int taskId);
 
 	static void sendThd(void *param);
 	
   private:
-    PlayTask* getPlayTask(int taskId);
+    std::shared_ptr<PlayTask> getPlayTask(int taskId);
 	
-    std::map<int, PlayTask> playTaskMap;
+    std::map<int, std::shared_ptr<PlayTask> > playTaskMap;
     std::mutex lock;
     static constexpr int TASK_TIMEOUT_SECONDS{120 *1};
     

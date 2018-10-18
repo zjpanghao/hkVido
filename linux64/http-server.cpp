@@ -213,7 +213,7 @@ static void stopplaytask(struct evhttp_request *req, void *arg) {
   int rc = 0;
   int task;
   int userId = -1;
-  PlayTask *playTask = NULL;
+  std::shared_ptr<PlayTask> playTask;
   evbuffer *response = evbuffer_new();
   const char *buffer = evhttp_request_uri(req);
   evhttp_parse_query(buffer, &keys);
@@ -262,7 +262,7 @@ static void playback(struct evhttp_request *req, void *arg) {
   int task;
   int user;
   int channel = 1;
-  std::unique_ptr<PlayTask> playTaskPtr;
+  std::shared_ptr<PlayTask> playTaskPtr;
 
   if (!checkIsNum(taskId) || 
   	!checkIsNum(userId) || 
@@ -298,7 +298,7 @@ static void playback(struct evhttp_request *req, void *arg) {
 	if (topic) {
 	  playTaskPtr->setTopic(topic);
 	}
-	if (!getDVRControl().addTask(playTaskPtr.get())) {
+	if (!getDVRControl().addTask(playTaskPtr)) {
 	  sendResponse(-3, "add task failed", req, response);
 	  goto DONE;
 	}
@@ -324,7 +324,7 @@ static void playReal(struct evhttp_request *req, void *arg) {
   StreamType stream = StreamType::CHILD_STREAM;
   int task;
   int user;
-  std::unique_ptr<PlayTask> playTaskPtr;
+  std::shared_ptr<PlayTask> playTaskPtr;
   std::map<std::string, int> kmap;
   std::string key;
   ChannelDVR *dvr;
@@ -383,7 +383,7 @@ static void playReal(struct evhttp_request *req, void *arg) {
     playTaskPtr->setAreaName(areaName);
   }
   playTaskPtr->setStreamType(stream);
-  if (!getDVRControl().addTask(playTaskPtr.get())) {
+  if (!getDVRControl().addTask(playTaskPtr)) {
     sendResponse(-2, "add task failed", req, response);
     goto DONE;
   }

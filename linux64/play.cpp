@@ -106,7 +106,7 @@ void DecodeTask::Run() {
     //}
   //}
   YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &param_.image, param_.width, param_.height, 75);
-  getDVRControl().addPackToTask(param_);
+  param_.task_->addPack(param_);
   // LOG(INFO) << "add pack :" << param_.inx;
   return;
   std::string imageBase64;
@@ -114,13 +114,13 @@ void DecodeTask::Run() {
   Base64::getBase64().encode(image, imageBase64);
   Json::Value root;
   root["bufferedImageStr"] = imageBase64;
-  root["taskId"] = param_.taskId;
+  root["taskId"] = param_.task_->getTaskId();
   //root["type"] = (int)playType;
   // root["stamp"] = (unsigned int)(param_.api)->getTimeStamp(param_.port);
   root["stamp"] = (unsigned int)(param_.timestamp);
-  root["cameraId"] = param_.cameraId;
-  root["cameraName"] = param_.cameraName;
-  root["area"] = param_.areaName;
+  root["cameraId"] = param_.task_->getCameraId();
+  root["cameraName"] = param_.task_->getCameraName();
+  root["area"] = param_.task_->getAreaName();
   String res = root.toStyledString();
   if (!param_.topic.empty()) {
   	//if (quality < 95) {

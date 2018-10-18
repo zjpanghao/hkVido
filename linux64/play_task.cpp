@@ -21,6 +21,24 @@ PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type) {
   topic="";
 }
 
+bool PlayTask:: getPack(TaskParam &pack) {
+  std::lock_guard<std::mutex> lock(lock_);
+  auto it = packMap_.find(readPackIndex);
+  if (it != packMap_.end()) {
+	pack = it->second;
+	packMap_.erase(it);
+    readPackIndex++;
+	return true;
+  }
+  return false;
+}
+
+void PlayTask::addPack(const TaskParam &pack) {
+  std::lock_guard<std::mutex> lock(lock_);
+  packMap_[pack.inx] = pack;
+}
+	
+
 PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type, long start, long end) :PlayTask(taskId, userId, channel, type) {
   this->vide.startTime = start;
   this->vide.endTime = end;

@@ -47,7 +47,7 @@ void CALLBACK HkApi::DecCBFun(int nPort,
             task->setPos(pos);
           }  
         }
-        TaskParam param_ = {task->getSdkApi(), nPort, task->getTaskId(), task->getTopic(),
+        TaskParam param_ = {task, task->getSdkApi(), nPort, task->getTaskId(), task->getTopic(),
         pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight,
         api->getTimeStamp(nPort), task->getCameraId(), task->getCameraName(), task->getAreaName()};
 		param_.inx = task->getWritePackIndex();
@@ -68,6 +68,7 @@ void HkApi::hkDataCallBack(LONG handle, DWORD dataType, BYTE *buffer, DWORD size
   if (task->getStatus() == PlayTaskStatus::STOP) {
     return;
   }
+  task->setUpdateTime(time(NULL));
   int nPort = task->getDePort();
   int maxCount = 3;
   switch (dataType) {
@@ -205,7 +206,7 @@ int HkApi::stopPlay(int handle, int port, PlayType type) {
   return rc;
 }
 
-int HkApi::playByTime(PlayTask *playTask) {
+int HkApi::playByTime(std::shared_ptr<PlayTask> playTask) {
   struct tm start;
   struct tm end;
   int rc = 0;
@@ -225,7 +226,7 @@ int HkApi::playByTime(PlayTask *playTask) {
     return rc;
   }
 
-  if (!NET_DVR_SetPlayDataCallBack_V40(lid, hkDataCallBack, (void*)playTask)) {
+  if (!NET_DVR_SetPlayDataCallBack_V40(lid, hkDataCallBack, (void*)playTask.get())) {
     LOG(ERROR) << "NET_DVR_SetPlayDataCallBack_V40 FAILED, error code:" << (rc = NET_DVR_GetLastError());
     return rc;
   }

@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include <memory>
 class SDKUser;
 class DeviceInfo;
 class PlayTask;
@@ -13,7 +14,7 @@ class SdkApi {
     virtual int init() = 0;
     virtual int login(SDKUser *user, DeviceInfo *info) = 0;
     virtual int logout(int userId) = 0;
-    virtual int playByTime(PlayTask *playTask) = 0;
+    virtual int playByTime(std::shared_ptr<PlayTask> playTask) = 0;
     virtual int playReal(PlayTask *playTask) = 0;
     virtual int stopPlay(int handle, int port, PlayType type) = 0;
     virtual int playBackControl(int handle, int flag, long param) = 0;

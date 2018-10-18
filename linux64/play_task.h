@@ -2,6 +2,8 @@
 #define INCLUDE_PLAY_TASK_H
 #include <stdio.h>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -155,20 +157,8 @@ class PlayTask {
       return api;
     }
 
-	bool getPack(TaskParam &pack) {
-	  auto it = packMap_.find(readPackIndex);
-	  if (it != packMap_.end()) {
-		pack = it->second;
-		packMap_.erase(it);
-	    readPackIndex++;
-		return true;
-	  }
-	  return false;
-	}
-
-	void addPack(const TaskParam &pack) {
-	  packMap_[pack.inx] = pack;
-    }
+	bool getPack(TaskParam &pack);
+	void addPack(const TaskParam &pack);
 	
 	int getWritePackIndex() {
 	  return writePackIndex;
@@ -206,6 +196,7 @@ class PlayTask {
 	std::thread *sendThdId{NULL};
 	int readPackIndex{0};
 	int writePackIndex{0};
+	std::mutex lock_;
     SdkApi *api;
 };
 #endif
