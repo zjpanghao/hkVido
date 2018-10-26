@@ -32,7 +32,7 @@ float DecodeTask::step_ = 0.01;
 
 void exeServiceInit() {
   for(int i = 0; i < MAX_THREAD_NUM; i++) {
-    executorService[i] = Executors::NewFixPool(5, MAX_DECODE_TASK);
+    executorService[i] = Executors::NewFixPool(10, MAX_DECODE_TASK);
   }
 
   for(int i = 0; i < MAX_THREAD_NUM; i++) {
@@ -69,11 +69,11 @@ bool YV12ToBGR24_OpenCV(unsigned char* pYUV,std::vector<unsigned char> *inImage,
 }
 
 DecodeTask::DecodeTask(
- const TaskParam &param)
+ std::shared_ptr<TaskParam> param)
     :  pbuf_(NULL), param_(param) {
   
-  pbuf_ = (char*)malloc(param.size);
-  memcpy(pbuf_, param.buf, param.size);
+  pbuf_ = (char*)malloc(param->size);
+  memcpy(pbuf_, param->buf, param->size);
 }
 
 DecodeTask::~DecodeTask() {
@@ -105,30 +105,9 @@ void DecodeTask::Run() {
 	//	fclose(f);
     //}
   //}
-  YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &param_.image, param_.width, param_.height, 75);
-  param_.task_->addPack(param_);
-  // LOG(INFO) << "add pack :" << param_.inx;
-  return;
-  std::string imageBase64;
-  // std::vector<unsigned char> origin(pbuf_, pbuf_ + (param_.width *param_.height)*3/2);
-  Base64::getBase64().encode(image, imageBase64);
-  Json::Value root;
-  root["bufferedImageStr"] = imageBase64;
-  root["taskId"] = param_.task_->getTaskId();
-  //root["type"] = (int)playType;
-  // root["stamp"] = (unsigned int)(param_.api)->getTimeStamp(param_.port);
-  root["stamp"] = (unsigned int)(param_.timestamp);
-  root["cameraId"] = param_.task_->getCameraId();
-  root["cameraName"] = param_.task_->getCameraName();
-  root["area"] = param_.task_->getAreaName();
-  String res = root.toStyledString();
-  if (!param_.topic.empty()) {
-  	//if (quality < 95) {
-  	//  jpgQuality_ += step_;
-    //}
-  	std::unique_ptr<MessageTask> messageTask(new MessageTask(param_.topic, res));
-    executorServiceMessage[param_.taskId & 0xf]->Execute(std::move(messageTask));
-  }
+  YV12ToBGR24_OpenCV((unsigned char*)pbuf_, &param_->image, param_->width, param_->height, 75);
+  param_->task_->addPack(param_);
+  LOG(INFO) << "add pack :" << param_->inx;
 }
 
 MessageTask::MessageTask(const std::string &topic, const std::string &mess) 

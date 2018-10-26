@@ -47,13 +47,15 @@ void CALLBACK HkApi::DecCBFun(int nPort,
             task->setPos(pos);
           }  
         }
-        TaskParam param_ = {task, task->getSdkApi(), nPort, task->getTaskId(), task->getTopic(),
-        pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight,
-        api->getTimeStamp(nPort), task->getCameraId(), task->getCameraName(), task->getAreaName()};
-		param_.inx = task->getWritePackIndex();
-		task->setWritePackIndex(param_.inx + 1);
-        std::unique_ptr<Runnable> decodeTask (new DecodeTask(param_));
-        getPlayService(param_.taskId & 0xf)->Execute(std::move(decodeTask));
+		
+        TaskParam tmp = {task, task->getSdkApi()->getTimeStamp(nPort),
+        	pBuf, nSize, pFrameInfo->nWidth, pFrameInfo->nHeight, 0
+        };
+		std::shared_ptr<TaskParam> pm(new TaskParam(tmp));
+		pm->inx = task->getWritePackIndex();
+		task->setWritePackIndex(pm->inx + 1);
+        std::unique_ptr<Runnable> decodeTask (new DecodeTask(pm));
+        getPlayService(task->getTaskId() & 0xf)->Execute(std::move(decodeTask));
       }
      
     } else {

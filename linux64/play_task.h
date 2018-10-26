@@ -28,6 +28,7 @@ class PlayTask {
     PlayTask(int taskId, int userId, int channel, PlayType type, long start, long end);
 
 	~PlayTask() {
+		delete sendThdId;
     }
 	
     int getTaskId()    const {
@@ -157,8 +158,8 @@ class PlayTask {
       return api;
     }
 
-	bool getPack(TaskParam &pack);
-	void addPack(const TaskParam &pack);
+	std::shared_ptr<TaskParam> getPack();
+	void addPack(std::shared_ptr<TaskParam> pack);
 	
 	int getWritePackIndex() {
 	  return writePackIndex;
@@ -192,10 +193,11 @@ class PlayTask {
     int cameraId;
     std::string cameraName;
     std::string areaName;
-	std::map<int, TaskParam> packMap_;
+	std::map<int, std::shared_ptr<TaskParam>> packMap_;
 	std::thread *sendThdId{NULL};
 	int readPackIndex{0};
 	int writePackIndex{0};
+	int timeout{0};
 	std::mutex lock_;
     SdkApi *api;
 };

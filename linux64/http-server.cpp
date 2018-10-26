@@ -53,6 +53,7 @@
 #include "json/json.h"
 #include <memory>
 #include "glog/logging.h"
+#include <sstream>
 #ifdef _WIN32
 #ifndef stat
 #define stat _stat
@@ -262,10 +263,13 @@ static void playback(struct evhttp_request *req, void *arg) {
   int task;
   int user;
   int channel = 1;
+  std::string key;
+  ChannelDVR *dvr;
   std::shared_ptr<PlayTask> playTaskPtr;
 
   if (!checkIsNum(taskId) || 
   	!checkIsNum(userId) || 
+  	!checkIsNum(channelId) || 
   	(endTime && !checkIsNum(endTime)) ||
   	(startTime && !checkIsNum(startTime)) ||
   	(endTime && !checkIsNum(endTime)) ||
@@ -285,7 +289,23 @@ static void playback(struct evhttp_request *req, void *arg) {
   }
 
   if (channelId != NULL) {
-    channel = atol(channelId);
+  	std::stringstream stream;
+	stream << channelId;
+  	stream >> channel;
+  }
+
+  key = getLoginControl().getIp(user);
+  dvr = getChannelControl().getDVR(key);
+  if (dvr == NULL) {
+	  sendResponse(-1, "no such user", req, response);
+	  goto DONE;
+  }
+  if (dvr->getFactoryType() == FactoryType::HAIKANG) {
+	  channel = channel / 100  -1 + dvr->getDevInfo()->byStartDChan;
+	} else {
+		sendResponse(-1
+  	 , "unknown device ", req, response);
+    	goto DONE;
   }
 
   if (!getDVRControl().hasFilePlay(user, channel, start, end)) {

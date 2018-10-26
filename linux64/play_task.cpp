@@ -21,21 +21,27 @@ PlayTask::PlayTask(int taskId, int userId, int channel, PlayType type) {
   topic="";
 }
 
-bool PlayTask:: getPack(TaskParam &pack) {
+std::shared_ptr<TaskParam> PlayTask:: getPack() {
+  if (timeout > 10) {
+  	LOG(INFO) << "time for " << readPackIndex;
+  	readPackIndex++;
+  }
   std::lock_guard<std::mutex> lock(lock_);
   auto it = packMap_.find(readPackIndex);
   if (it != packMap_.end()) {
-	pack = it->second;
+	auto pack = it->second;
 	packMap_.erase(it);
     readPackIndex++;
-	return true;
+	timeout = 0;
+	return pack;
   }
-  return false;
+  timeout++;
+  return NULL;
 }
 
-void PlayTask::addPack(const TaskParam &pack) {
+void PlayTask::addPack(std::shared_ptr<TaskParam> pack) {
   std::lock_guard<std::mutex> lock(lock_);
-  packMap_[pack.inx] = pack;
+  packMap_[pack->inx] = pack;
 }
 	
 

@@ -37,18 +37,11 @@ enum PlayTaskStatus {
 
 struct TaskParam{
   PlayTask *task_;
-  SdkApi *api;
-  int port;
-  int taskId;
-  std::string topic;
+  long timestamp;
   const char *buf;
   int size;
   int width;
   int height;
-  long timestamp;
-  int cameraId;
-  std::string cameraName;
-  std::string areaName;
   int inx;
   std::vector<unsigned char> image;
 };

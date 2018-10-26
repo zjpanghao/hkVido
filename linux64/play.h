@@ -9,13 +9,13 @@ class SdkApi;
 
 class DecodeTask : public Runnable {
  public:
-  DecodeTask(const TaskParam &param);
+  DecodeTask(std::shared_ptr<TaskParam> param);
   void Run();
   virtual ~DecodeTask();
   virtual void ErrorMsg(int id, const std::string &msg);
   
  private:
-  TaskParam param_;
+  std::shared_ptr<TaskParam> param_;
   char *pbuf_;
   static float jpgQuality_;
   static float step_;

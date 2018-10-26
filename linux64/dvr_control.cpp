@@ -21,9 +21,9 @@ DVRControl & getDVRControl() {
    if (info.channelStat.stat != 0) {
      return false;
    }
-   if (playTask->getPlayType() == PlayType::PLAYBACK && !info.channelStat.recordStat) {
-     return false;
-   }
+   //if (playTask->getPlayType() == PlayType::PLAYBACK && !info.channelStat.recordStat) {
+   //  return false;
+   //}
    std::lock_guard<std::mutex> guard(lock);
    auto it = playTaskMap.find(playTask->getTaskId());
    if (it != playTaskMap.end()) {
@@ -186,7 +186,7 @@ std::string DVRControl::getTaskInfo() {
       }   
       LOG(INFO) << "task " <<  it->first << "clear";
       // it++;
-      delete task->getSendThdId();
+    
       playTaskMap.erase(it++);
     } 
  }
@@ -210,15 +210,6 @@ std::string DVRControl::getTaskInfo() {
     auto it = playTaskMap.find(taskId);
     if (it != playTaskMap.end()) {
       it->second->setPlayHandle(handle);
-    }
-  }
-
-  void DVRControl::addPackToTask(const TaskParam &param) {
-	std::lock_guard<std::mutex> guard(lock);
-    auto it = playTaskMap.find(param.taskId);
-    if (it != playTaskMap.end()) {
-      std::shared_ptr<PlayTask> task = it->second;
-	  task->addPack(param);
     }
   }
 
@@ -256,29 +247,37 @@ void heartBeatCheck() {
 void DVRControl::sendThd(void *param) {
     sleep(2);
 	PlayTask *task = (PlayTask *)param;
-	TaskParam taskParam;
+	std::shared_ptr<TaskParam> taskParam;
 	LOG(INFO) << "task start" << task->getTaskId();
+	int timeout = 0;
 	while (task->getStatus() == PlayTaskStatus::START) {
-		while (task->getPack(taskParam)) {
-		  std::string imageBase64;
-		  if (taskParam.image.empty()) {
-		    continue;
+		
+		while (true) {
+		  if (taskParam = task->getPack()) {
+		  } else {
+		  	timeout++;
+			break;
 		  }
-		  LOG(INFO) << "get:" << taskParam.inx;
-		  Base64::getBase64().encode(taskParam.image, imageBase64);
+		  std::string imageBase64;
+		  if (taskParam->image.empty()) {
+		    break;
+		  }
+		  LOG(INFO) << "get:" << taskParam->inx;
+		  Base64::getBase64().encode(taskParam->image, imageBase64);
 		  Json::Value root;
 		  root["bufferedImageStr"] = imageBase64;
-		  root["taskId"] = taskParam.taskId;
-		  root["stamp"] = (unsigned int)(taskParam.timestamp);
-		  root["cameraId"] = taskParam.cameraId;
-		  root["cameraName"] = taskParam.cameraName;
-		  root["area"] = taskParam.areaName;
+		  root["taskId"] = taskParam->task_->getTaskId();
+		  root["stamp"] = (unsigned int)(taskParam->timestamp);
+		  root["cameraId"] = taskParam->task_->getCameraId();
+		  root["cameraName"] = taskParam->task_->getCameraName();
+		  root["area"] = taskParam->task_->getAreaName();
 		  std::string res = root.toStyledString();
-		  if (!taskParam.topic.empty()) {
-		  	std::unique_ptr<MessageTask> messageTask(new MessageTask(taskParam.topic, res));
-		    getStoreService(taskParam.taskId & 0xf)->Execute(std::move(messageTask));
+		  if (!taskParam->task_->getTopic().empty()) {
+		  	std::unique_ptr<MessageTask> messageTask(new MessageTask(taskParam->task_->getTopic(), res));
+		    getStoreService(taskParam->task_->getTaskId() & 0xf)->Execute(std::move(messageTask));
 		 }
 	   } 
-	   std::this_thread::sleep_for(std::chrono::milliseconds(1));
+	   std::this_thread::sleep_for(std::chrono::milliseconds(1000/25));
+
    }
 }
